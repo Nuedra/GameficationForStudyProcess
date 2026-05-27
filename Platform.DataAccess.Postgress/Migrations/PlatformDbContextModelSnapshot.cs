@@ -156,12 +156,6 @@ namespace Platform.DataAccess.Postgress.Migrations
 
             modelBuilder.Entity("Platform.DataAccess.Postgress.StudentEntity", b =>
                 {
-                    b.Property<string>("AcademicDataJson")
-                        .HasColumnType("text");
-
-                    b.Property<string>("ExternalStudentNumberRaw")
-                        .HasColumnType("text");
-
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
@@ -173,9 +167,6 @@ namespace Platform.DataAccess.Postgress.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<int?>("StudentNumber")
-                        .HasColumnType("integer");
 
                     b.Property<string>("Surname")
                         .IsRequired()

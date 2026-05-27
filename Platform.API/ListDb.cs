@@ -39,9 +39,6 @@ public sealed class ListDbConnection
         if (student is null)
             throw new InvalidOperationException($"Student with id {studentId} was not found.");
 
-        if (!string.IsNullOrWhiteSpace(student.AcademicDataJson))
-            return student.AcademicDataJson;
-
         return JsonSerializer.Serialize(
             new
             {
