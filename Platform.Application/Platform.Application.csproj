@@ -10,8 +10,4 @@
     <ProjectReference Include="..\Platform.Core\Platform.Core.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Compile Remove="oldServs\**\*.cs" />
-  </ItemGroup>
-
 </Project>
