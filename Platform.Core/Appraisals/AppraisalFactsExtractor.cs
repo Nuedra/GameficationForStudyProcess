@@ -25,7 +25,10 @@ public sealed class AppraisalFactsExtractor : IAppraisalFactsExtractor
                     MinAcceptScore = mark.MinAcceptScore,
                     Score = mark.Score,
                     ScoreSourceName = mark.ScoreSourceName,
-                    UpdatedAt = mark.UpdatedAt
+                    UpdatedAt = mark.UpdatedAt,
+                    Tags = mark.Tags,
+                    Deadline = mark.Deadline,
+                    UploadedAt = mark.UploadedAt
                 });
             }
         }

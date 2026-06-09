@@ -100,5 +100,14 @@ public sealed class AppraisalPayloadParser : IAppraisalPayloadParser
 
         if (mark.Score.HasValue && mark.Score.Value > mark.MaxScore)
             throw new AppraisalPayloadException($"{prefix}.score cannot be greater than maxScore.");
+
+        if (mark.Tags is null)
+            throw new AppraisalPayloadException($"{prefix}.tags cannot be null.");
+
+        for (var tagIndex = 0; tagIndex < mark.Tags.Count; tagIndex++)
+        {
+            if (string.IsNullOrWhiteSpace(mark.Tags[tagIndex]))
+                throw new AppraisalPayloadException($"{prefix}.tags[{tagIndex}] cannot be empty.");
+        }
     }
 }

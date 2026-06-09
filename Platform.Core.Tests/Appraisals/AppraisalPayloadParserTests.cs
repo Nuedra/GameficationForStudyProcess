@@ -32,6 +32,9 @@ public sealed class AppraisalPayloadParserTests
         Assert.Equal(9, firstMark.Score);
         Assert.Equal("Иванов И.И.", firstMark.ScoreSourceName);
         Assert.Equal(DateTimeOffset.Parse("2025-10-20T14:35:00Z"), firstMark.UpdatedAt);
+        Assert.Equal(["lab1_completed", "lab1_success"], firstMark.Tags);
+        Assert.Equal(DateTimeOffset.Parse("2025-10-19T20:59:59Z"), firstMark.Deadline);
+        Assert.Equal(DateTimeOffset.Parse("2025-10-18T16:20:00Z"), firstMark.UploadedAt);
     }
 
     [Fact]
@@ -46,6 +49,9 @@ public sealed class AppraisalPayloadParserTests
         Assert.Null(mark.Score);
         Assert.Null(mark.ScoreSourceName);
         Assert.Null(mark.UpdatedAt);
+        Assert.Empty(mark.Tags);
+        Assert.Null(mark.Deadline);
+        Assert.Null(mark.UploadedAt);
     }
 
     [Fact]
@@ -161,7 +167,10 @@ public sealed class AppraisalPayloadParserTests
               "minAcceptScore": 6,
               "score": 9,
               "scoreSourceName": "Иванов И.И.",
-              "updatedAt": "2025-10-20T14:35:00Z"
+              "updatedAt": "2025-10-20T14:35:00Z",
+              "tags": ["lab1_completed", "lab1_success"],
+              "deadline": "2025-10-19T20:59:59Z",
+              "uploadedAt": "2025-10-18T16:20:00Z"
             },
             {
               "columnId": "7a8b9c0d-1e2f-3a4b-5c6d-1a2b3c4d5e6f",
@@ -199,7 +208,10 @@ public sealed class AppraisalPayloadParserTests
               "minAcceptScore": 6,
               "score": null,
               "scoreSourceName": null,
-              "updatedAt": null
+              "updatedAt": null,
+              "tags": [],
+              "deadline": null,
+              "uploadedAt": null
             }
           ]
         }

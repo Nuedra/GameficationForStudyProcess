@@ -35,6 +35,9 @@ public sealed class AppraisalFactsExtractorTests
         Assert.Equal(9, mark.Score);
         Assert.Equal("Иванов И.И.", mark.ScoreSourceName);
         Assert.Equal(DateTimeOffset.Parse("2025-10-20T14:35:00Z"), mark.UpdatedAt);
+        Assert.Equal(["lab1_completed", "lab1_success"], mark.Tags);
+        Assert.Equal(DateTimeOffset.Parse("2025-10-19T20:59:59Z"), mark.Deadline);
+        Assert.Equal(DateTimeOffset.Parse("2025-10-18T16:20:00Z"), mark.UploadedAt);
     }
 
     [Fact]
@@ -80,7 +83,10 @@ public sealed class AppraisalFactsExtractorTests
                             MinAcceptScore = 6,
                             Score = 9,
                             ScoreSourceName = "Иванов И.И.",
-                            UpdatedAt = DateTimeOffset.Parse("2025-10-20T14:35:00Z")
+                            UpdatedAt = DateTimeOffset.Parse("2025-10-20T14:35:00Z"),
+                            Tags = ["lab1_completed", "lab1_success"],
+                            Deadline = DateTimeOffset.Parse("2025-10-19T20:59:59Z"),
+                            UploadedAt = DateTimeOffset.Parse("2025-10-18T16:20:00Z")
                         },
                         new AppraisalMarkDto
                         {

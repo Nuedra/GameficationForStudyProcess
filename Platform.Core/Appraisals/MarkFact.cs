@@ -16,6 +16,9 @@ public sealed class MarkFact
     public decimal? Score { get; init; }
     public string? ScoreSourceName { get; init; }
     public DateTimeOffset? UpdatedAt { get; init; }
+    public required IReadOnlyList<string> Tags { get; init; }
+    public DateTimeOffset? Deadline { get; init; }
+    public DateTimeOffset? UploadedAt { get; init; }
 
     public bool IsSet => Score.HasValue;
 

@@ -10,4 +10,7 @@ public sealed class AppraisalMarkDto
     public decimal? Score { get; init; }
     public string? ScoreSourceName { get; init; }
     public DateTimeOffset? UpdatedAt { get; init; }
+    public List<string> Tags { get; init; } = [];
+    public DateTimeOffset? Deadline { get; init; }
+    public DateTimeOffset? UploadedAt { get; init; }
 }
