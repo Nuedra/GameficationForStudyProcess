@@ -1,8 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using Platform.API;
-using Platform.Core.Evaluation;
-using Platform.Core.Models;
-using Platform.Core.Parsing;
+using Platform.Core.Appraisals;
 using Platform.DataAccess.Postgress;
 
 namespace Platform.Core.Processing;
@@ -10,39 +7,68 @@ namespace Platform.Core.Processing;
 public sealed class AchievementProcessingCycle
 {
     private readonly string _connectionString;
+    private readonly IAppraisalPayloadProvider _payloadProvider;
+    private readonly IAppraisalFactsExtractor _factsExtractor;
+    private readonly TimeProvider _timeProvider;
 
-    public AchievementProcessingCycle(string connectionString)
+    public AchievementProcessingCycle(
+        string connectionString,
+        IAppraisalPayloadProvider payloadProvider,
+        IAppraisalFactsExtractor factsExtractor,
+        TimeProvider? timeProvider = null)
     {
         if (string.IsNullOrWhiteSpace(connectionString))
             throw new ArgumentException("Connection string is required.", nameof(connectionString));
 
         _connectionString = connectionString;
+        _payloadProvider = payloadProvider ?? throw new ArgumentNullException(nameof(payloadProvider));
+        _factsExtractor = factsExtractor ?? throw new ArgumentNullException(nameof(factsExtractor));
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public async Task<AchievementProcessingResult> RunAsync(Guid studentId, CancellationToken cancellationToken = default)
     {
+        // подключение к БД
         await using var db = PlatformDatabase.Connect(_connectionString);
 
-        var achievementEntities = await db.Achievements
+        // ищет студента и проверяет его наличие
+        var studentExists = await db.Students
             .AsNoTracking()
-            .Include(a => a.Criteria)
-            .ToListAsync(cancellationToken);
+            .AnyAsync(student => student.Id == studentId, cancellationToken);
 
-        var achievements = achievementEntities
-            .Select(entity => new Achievement(entity))
+        if (!studentExists)
+            throw new InvalidOperationException($"Student with id {studentId} was not found.");
+
+        // поиск ДТО нужного студента
+        var payloads = await _payloadProvider.GetPayloadsAsync(cancellationToken);
+        var facts = payloads
+            .Where(payload => payload.StudentId == studentId)
+            .Select(_factsExtractor.Extract)
             .ToList();
 
-        var listDb = new ListDbConnection(_connectionString);
-        listDb.connect();
+        // загрузка достижений только для курсов и годов из ДТО студента
+        var achievementEntities = new List<AchievementEntity>();
+        var courseYears = facts
+            .Select(courseFacts => (courseFacts.CourseId, courseFacts.Year))
+            .Distinct()
+            .ToList();
 
-        var studentJson = await listDb.GetUserDataJsonAsync(studentId, cancellationToken)
-            .ConfigureAwait(false);
-        var studentData = JsonDataParser.ParseToDictionary(studentJson);
+        foreach (var (courseId, year) in courseYears)
+        {
+            achievementEntities.AddRange(await db.Achievements
+                .AsNoTracking()
+                .Include(achievement => achievement.Criteria)
+                .Where(achievement =>
+                    achievement.CourseID == courseId &&
+                    achievement.Year == year)
+                .ToListAsync(cancellationToken));
+        }
 
-        var matched = new List<Achievement>();
+        var matchedEntities = new List<AchievementEntity>();
         var checkedCount = 0;
 
-        foreach (var achievement in achievements)
+        // перебор всех загруженных достижений
+        foreach (var achievement in achievementEntities)
         {
             var criteria = achievement.Criteria;
             if (criteria == null || !criteria.IsEnabled)
@@ -50,20 +76,89 @@ public sealed class AchievementProcessingCycle
 
             checkedCount++;
 
-            if (AchievementsCriteriaEvalEvaluator.Evaluate(criteria.Expression, studentData))
-                matched.Add(achievement);
+            if (facts.Any(courseFacts => IsMatch(achievement, courseFacts)))
+                matchedEntities.Add(achievement);
         }
 
+        var matchedIds = matchedEntities.Select(achievement => achievement.Id).ToList();
+        var existingAchievementIds = (await db.StudentAchievements
+            .AsNoTracking()
+            .Where(item => item.StudentID == studentId && matchedIds.Contains(item.AchievementID))
+            .Select(item => item.AchievementID)
+            .ToListAsync(cancellationToken))
+            .ToHashSet();
+
+        // запись в бд новых полученных достижений
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        var assignedEntities = matchedEntities
+            .Where(achievement => !existingAchievementIds.Contains(achievement.Id))
+            .Select(achievement => new StudentAchievementEntity
+            {
+                Id = Guid.NewGuid(),
+                StudentID = studentId,
+                AchievementID = achievement.Id,
+                AchievementGotDate = GetAchievementGotDate(achievement, facts, now),
+                AchievementFoundDate = now,
+                IsNotificationSeen = false,
+                IsFirstAnimationShown = false
+            })
+            .ToList();
+
+        if (assignedEntities.Count > 0)
+        {
+            db.StudentAchievements.AddRange(assignedEntities);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        var matched = matchedEntities
+            .Select(entity => new ProcessedAchievement(entity.Id, entity.Title))
+            .ToList();
+        var assignedIds = assignedEntities.Select(entity => entity.AchievementID).ToHashSet();
+        var assigned = matched.Where(achievement => assignedIds.Contains(achievement.Id)).ToList();
+
+        // возвращает результат работы цикла
         return new AchievementProcessingResult(
-            TotalAchievements: achievements.Count,
+            TotalAchievements: achievementEntities.Count,
             CheckedAchievements: checkedCount,
-            MatchedAchievements: matched
+            MatchedAchievements: matched,
+            AssignedAchievements: assigned
         );
+    }
+
+    private static bool IsMatch(AchievementEntity achievement, StudentCourseFacts facts)
+    {
+        return achievement.CourseID == facts.CourseId &&
+               achievement.Year == facts.Year &&
+               facts.Marks.Any(mark => AchievementTagMatcher.IsMatch(achievement.Criteria.Expression, mark.Tags));
+    }
+
+    private static DateTime GetAchievementGotDate(
+        AchievementEntity achievement,
+        IReadOnlyList<StudentCourseFacts> facts,
+        DateTime fallback)
+    {
+        var requiredTags = AchievementTagMatcher.ParseExpression(achievement.Criteria.Expression);
+
+        return facts
+            .Where(courseFacts =>
+                courseFacts.CourseId == achievement.CourseID &&
+                courseFacts.Year == achievement.Year)
+            .SelectMany(courseFacts => courseFacts.Marks)
+            .Where(mark => requiredTags.All(requiredTag =>
+                mark.Tags.Contains(requiredTag, StringComparer.Ordinal)))
+            .Select(mark => mark.UploadedAt ?? mark.UpdatedAt)
+            .Where(date => date.HasValue)
+            .Select(date => date!.Value.UtcDateTime)
+            .DefaultIfEmpty(fallback)
+            .Min();
     }
 }
 
 public sealed record AchievementProcessingResult(
     int TotalAchievements,
     int CheckedAchievements,
-    IReadOnlyList<Achievement> MatchedAchievements
+    IReadOnlyList<ProcessedAchievement> MatchedAchievements,
+    IReadOnlyList<ProcessedAchievement> AssignedAchievements
 );
+
+public sealed record ProcessedAchievement(Guid Id, string Title);

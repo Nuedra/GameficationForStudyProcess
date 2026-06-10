@@ -26,7 +26,7 @@ public sealed class AppraisalFactsExtractor : IAppraisalFactsExtractor
                     Score = mark.Score,
                     ScoreSourceName = mark.ScoreSourceName,
                     UpdatedAt = mark.UpdatedAt,
-                    Tags = mark.Tags,
+                    Tags = BuildTags(mark),
                     Deadline = mark.Deadline,
                     UploadedAt = mark.UploadedAt
                 });
@@ -40,5 +40,22 @@ public sealed class AppraisalFactsExtractor : IAppraisalFactsExtractor
             Year = payload.Year,
             Marks = marks
         };
+    }
+
+    private static IReadOnlyList<string> BuildTags(AppraisalMarkDto mark)
+    {
+        var tags = mark.Tags.ToHashSet(StringComparer.Ordinal);
+
+        if (mark.UploadedAt.HasValue &&
+            mark.Deadline.HasValue &&
+            mark.UploadedAt.Value <= mark.Deadline.Value)
+        {
+            tags.Add("intime");
+        }
+
+        if (mark.Score.HasValue && mark.Score.Value == mark.MaxScore)
+            tags.Add("maxscore");
+
+        return tags.ToList();
     }
 }

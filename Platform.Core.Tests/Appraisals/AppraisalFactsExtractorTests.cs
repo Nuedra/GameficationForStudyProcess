@@ -35,7 +35,10 @@ public sealed class AppraisalFactsExtractorTests
         Assert.Equal(9, mark.Score);
         Assert.Equal("Иванов И.И.", mark.ScoreSourceName);
         Assert.Equal(DateTimeOffset.Parse("2025-10-20T14:35:00Z"), mark.UpdatedAt);
-        Assert.Equal(["lab1_completed", "lab1_success"], mark.Tags);
+        Assert.Equal(3, mark.Tags.Count);
+        Assert.Contains("lab1_completed", mark.Tags);
+        Assert.Contains("lab1_success", mark.Tags);
+        Assert.Contains("intime", mark.Tags);
         Assert.Equal(DateTimeOffset.Parse("2025-10-19T20:59:59Z"), mark.Deadline);
         Assert.Equal(DateTimeOffset.Parse("2025-10-18T16:20:00Z"), mark.UploadedAt);
     }
@@ -55,6 +58,31 @@ public sealed class AppraisalFactsExtractorTests
         Assert.False(unsetMark.IsSet);
         Assert.False(unsetMark.IsPassed);
         Assert.Null(unsetMark.ScorePercent);
+    }
+
+    [Fact]
+    public void Extract_AddsComputedTags()
+    {
+        var payload = CreatePayload();
+        payload.AppraisalLists[0].Marks.Add(new AppraisalMarkDto
+        {
+            ColumnId = Guid.NewGuid(),
+            ColumnName = "Лабораторная работа №2",
+            IsComputed = false,
+            MaxScore = 10,
+            MinAcceptScore = 6,
+            Score = 10,
+            Tags = ["existing", "maxscore"],
+            Deadline = DateTimeOffset.Parse("2025-10-19T20:59:59Z"),
+            UploadedAt = DateTimeOffset.Parse("2025-10-20T16:20:00Z")
+        });
+
+        var facts = new AppraisalFactsExtractor().Extract(payload);
+        var mark = facts.Marks[2];
+
+        Assert.Contains("maxscore", mark.Tags);
+        Assert.DoesNotContain("intime", mark.Tags);
+        Assert.Equal(1, mark.Tags.Count(tag => tag == "maxscore"));
     }
 
     private static AppraisalPayloadDto CreatePayload()
