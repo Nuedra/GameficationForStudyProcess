@@ -6,7 +6,7 @@ namespace Platform.Core.Processing;
 
 public sealed class AchievementProcessingCycle
 {
-    private readonly string _connectionString;
+    private readonly Func<PlatformDbContext> _dbContextFactory;
     private readonly IAppraisalPayloadProvider _payloadProvider;
     private readonly IAppraisalFactsExtractor _factsExtractor;
     private readonly TimeProvider _timeProvider;
@@ -20,7 +20,19 @@ public sealed class AchievementProcessingCycle
         if (string.IsNullOrWhiteSpace(connectionString))
             throw new ArgumentException("Connection string is required.", nameof(connectionString));
 
-        _connectionString = connectionString;
+        _dbContextFactory = () => PlatformDatabase.Connect(connectionString);
+        _payloadProvider = payloadProvider ?? throw new ArgumentNullException(nameof(payloadProvider));
+        _factsExtractor = factsExtractor ?? throw new ArgumentNullException(nameof(factsExtractor));
+        _timeProvider = timeProvider ?? TimeProvider.System;
+    }
+
+    internal AchievementProcessingCycle(
+        Func<PlatformDbContext> dbContextFactory,
+        IAppraisalPayloadProvider payloadProvider,
+        IAppraisalFactsExtractor factsExtractor,
+        TimeProvider? timeProvider = null)
+    {
+        _dbContextFactory = dbContextFactory ?? throw new ArgumentNullException(nameof(dbContextFactory));
         _payloadProvider = payloadProvider ?? throw new ArgumentNullException(nameof(payloadProvider));
         _factsExtractor = factsExtractor ?? throw new ArgumentNullException(nameof(factsExtractor));
         _timeProvider = timeProvider ?? TimeProvider.System;
@@ -29,7 +41,7 @@ public sealed class AchievementProcessingCycle
     public async Task<AchievementProcessingResult> RunAsync(Guid studentId, CancellationToken cancellationToken = default)
     {
         // подключение к БД
-        await using var db = PlatformDatabase.Connect(_connectionString);
+        await using var db = _dbContextFactory();
 
         // ищет студента и проверяет его наличие
         var studentExists = await db.Students
@@ -141,7 +153,7 @@ public sealed class AchievementProcessingCycle
         );
     }
 
-    private static IReadOnlyList<AchievementEntity> ResolveDependencies(
+    internal static IReadOnlyList<AchievementEntity> ResolveDependencies(
         IEnumerable<AchievementEntity> candidates,
         IReadOnlySet<Guid> existingAchievementIds,
         IReadOnlyList<AchievementDependency> connections)
@@ -177,14 +189,14 @@ public sealed class AchievementProcessingCycle
         return assignable;
     }
 
-    private static bool IsMatch(AchievementEntity achievement, StudentCourseFacts facts)
+    internal static bool IsMatch(AchievementEntity achievement, StudentCourseFacts facts)
     {
         return achievement.CourseID == facts.CourseId &&
                achievement.Year == facts.Year &&
                facts.Marks.Any(mark => AchievementTagMatcher.IsMatch(achievement.Criteria.Expression, mark.Tags));
     }
 
-    private static DateTime GetAchievementGotDate(
+    internal static DateTime GetAchievementGotDate(
         AchievementEntity achievement,
         IReadOnlyList<StudentCourseFacts> facts,
         DateTime fallback)
