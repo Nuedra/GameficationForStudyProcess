@@ -83,15 +83,25 @@ public sealed class AchievementProcessingCycle
         var matchedIds = matchedEntities.Select(achievement => achievement.Id).ToList();
         var existingAchievementIds = (await db.StudentAchievements
             .AsNoTracking()
-            .Where(item => item.StudentID == studentId && matchedIds.Contains(item.AchievementID))
+            .Where(item => item.StudentID == studentId)
             .Select(item => item.AchievementID)
             .ToListAsync(cancellationToken))
             .ToHashSet();
 
+        var connections = await db.AchievementConnections
+            .AsNoTracking()
+            .Where(connection => matchedIds.Contains(connection.TargetId))
+            .Select(connection => new AchievementDependency(connection.SourceId, connection.TargetId))
+            .ToListAsync(cancellationToken);
+
+        var assignableEntities = ResolveDependencies(
+            matchedEntities.Where(achievement => !existingAchievementIds.Contains(achievement.Id)),
+            existingAchievementIds,
+            connections);
+
         // запись в бд новых полученных достижений
         var now = _timeProvider.GetUtcNow().UtcDateTime;
-        var assignedEntities = matchedEntities
-            .Where(achievement => !existingAchievementIds.Contains(achievement.Id))
+        var assignedEntities = assignableEntities
             .Select(achievement => new StudentAchievementEntity
             {
                 Id = Guid.NewGuid(),
@@ -115,14 +125,56 @@ public sealed class AchievementProcessingCycle
             .ToList();
         var assignedIds = assignedEntities.Select(entity => entity.AchievementID).ToHashSet();
         var assigned = matched.Where(achievement => assignedIds.Contains(achievement.Id)).ToList();
+        var dependencyBlocked = matched
+            .Where(achievement =>
+                !existingAchievementIds.Contains(achievement.Id) &&
+                !assignedIds.Contains(achievement.Id))
+            .ToList();
 
         // возвращает результат работы цикла
         return new AchievementProcessingResult(
             TotalAchievements: achievementEntities.Count,
             CheckedAchievements: checkedCount,
             MatchedAchievements: matched,
-            AssignedAchievements: assigned
+            AssignedAchievements: assigned,
+            DependencyBlockedAchievements: dependencyBlocked
         );
+    }
+
+    private static IReadOnlyList<AchievementEntity> ResolveDependencies(
+        IEnumerable<AchievementEntity> candidates,
+        IReadOnlySet<Guid> existingAchievementIds,
+        IReadOnlyList<AchievementDependency> connections)
+    {
+        var availableAchievementIds = existingAchievementIds.ToHashSet();
+        var pending = candidates.ToDictionary(achievement => achievement.Id);
+        var dependenciesByTarget = connections
+            .GroupBy(connection => connection.TargetId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(connection => connection.SourceId).ToHashSet());
+        var assignable = new List<AchievementEntity>();
+
+        while (pending.Count > 0)
+        {
+            var unlocked = pending.Values
+                .Where(achievement =>
+                    !dependenciesByTarget.TryGetValue(achievement.Id, out var dependencies) ||
+                    dependencies.Any(availableAchievementIds.Contains))
+                .ToList();
+
+            if (unlocked.Count == 0)
+                break;
+
+            foreach (var achievement in unlocked)
+            {
+                pending.Remove(achievement.Id);
+                availableAchievementIds.Add(achievement.Id);
+                assignable.Add(achievement);
+            }
+        }
+
+        return assignable;
     }
 
     private static bool IsMatch(AchievementEntity achievement, StudentCourseFacts facts)
@@ -158,7 +210,10 @@ public sealed record AchievementProcessingResult(
     int TotalAchievements,
     int CheckedAchievements,
     IReadOnlyList<ProcessedAchievement> MatchedAchievements,
-    IReadOnlyList<ProcessedAchievement> AssignedAchievements
+    IReadOnlyList<ProcessedAchievement> AssignedAchievements,
+    IReadOnlyList<ProcessedAchievement> DependencyBlockedAchievements
 );
 
 public sealed record ProcessedAchievement(Guid Id, string Title);
+
+public sealed record AchievementDependency(Guid SourceId, Guid TargetId);
