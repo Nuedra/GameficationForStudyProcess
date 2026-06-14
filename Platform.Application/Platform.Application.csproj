@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Platform.Core\Platform.Core.csproj" />
+    <ProjectReference Include="..\Platform.DataAccess.Postgress\Platform.DataAccess.Postgress.csproj" />
   </ItemGroup>
 
 </Project>
