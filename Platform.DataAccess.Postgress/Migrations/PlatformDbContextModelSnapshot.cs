@@ -80,6 +80,9 @@ namespace Platform.DataAccess.Postgress.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("LabID")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Rarity")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -102,6 +105,8 @@ namespace Platform.DataAccess.Postgress.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CourseID");
+
+                    b.HasIndex("LabID");
 
                     b.ToTable("achievements", (string)null);
                 });
@@ -153,12 +158,17 @@ namespace Platform.DataAccess.Postgress.Migrations
                     b.Property<bool>("IsNotificationSeen")
                         .HasColumnType("boolean");
 
+                    b.Property<Guid?>("LabID")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("StudentID")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
                     b.HasIndex("AchievementID");
+
+                    b.HasIndex("LabID");
 
                     b.HasIndex("StudentID", "AchievementID")
                         .IsUnique();

@@ -55,7 +55,7 @@ VALUES (
     'IS-101'
 );
 
-INSERT INTO "achievements" ("Id", "Title", "Description", "Year", "Rarity", "Track", "CourseID")
+INSERT INTO "achievements" ("Id", "Title", "Description", "Year", "Rarity", "Track", "LabID", "CourseID")
 VALUES
 (
     '33333333-3333-3333-3333-333333333333',
@@ -64,6 +64,7 @@ VALUES
     2026,
     'Common',
     'default',
+    NULL,
     '22222222-2222-2222-2222-222222222222'
 ),
 (
@@ -73,6 +74,7 @@ VALUES
     2026,
     'Rare',
     'semantic',
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
     '22222222-2222-2222-2222-222222222222'
 );
 
@@ -93,7 +95,7 @@ VALUES
 
 INSERT INTO "student_achievements"
     ("Id", "AchievementGotDate", "AchievementFoundDate", "IsNotificationSeen",
-     "IsFirstAnimationShown", "AchievementID", "StudentID")
+     "IsFirstAnimationShown", "LabID", "AchievementID", "StudentID")
 VALUES
 (
     '77777777-7777-7777-7777-777777777777',
@@ -101,6 +103,7 @@ VALUES
     NOW(),
     FALSE,
     FALSE,
+    NULL,
     '33333333-3333-3333-3333-333333333333',
     '11111111-1111-1111-1111-111111111111'
 ),
@@ -110,6 +113,7 @@ VALUES
     NOW(),
     FALSE,
     FALSE,
+    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
     '44444444-4444-4444-4444-444444444444',
     '11111111-1111-1111-1111-111111111111'
 );

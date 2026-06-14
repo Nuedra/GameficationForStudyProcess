@@ -86,6 +86,8 @@ namespace Platform.DataAccess.Postgress
                 e.Property(x => x.Year).IsRequired();
                 e.Property(x => x.Rarity).IsRequired().HasDefaultValue("Common");
                 e.Property(x => x.Track).IsRequired().HasDefaultValue("default");
+                e.Property(x => x.LabID).IsRequired(false);
+                e.HasIndex(x => x.LabID);
 
                 // Achievement -> StudentAchievements (1:N)
                 e.HasMany(x => x.StudentAchievements)
@@ -112,6 +114,8 @@ namespace Platform.DataAccess.Postgress
                 e.Property(x => x.AchievementFoundDate).IsRequired();
                 e.Property(x => x.IsNotificationSeen).IsRequired();
                 e.Property(x => x.IsFirstAnimationShown).IsRequired();
+                e.Property(x => x.LabID).IsRequired(false);
+                e.HasIndex(x => x.LabID);
 
                 // можно запретить дубликаты: один студент — одно достижение
                 e.HasIndex(x => new { x.StudentID, x.AchievementID }).IsUnique();

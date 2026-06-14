@@ -9,6 +9,7 @@ namespace Platform.DataAccess.Postgress
         public int Year { get; set; }
         public string Rarity { get; set; } = "Common";
         public string Track { get; set; } = "default";
+        public Guid? LabID { get; set; }
         public Guid CourseID { get; set; }
         public CourseEntity Course { get; set; }
         public List<StudentAchievementEntity> StudentAchievements { get; set; } = [];

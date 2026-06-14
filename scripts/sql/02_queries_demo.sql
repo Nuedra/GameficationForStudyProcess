@@ -6,6 +6,7 @@ SELECT
     sa."Id" AS student_achievement_id,
     sa."AchievementGotDate",
     sa."IsNotificationSeen",
+    sa."LabID",
     a."Title" AS achievement_title,
     c."Title" AS course_title
 FROM "student_achievements" sa
@@ -21,6 +22,7 @@ SELECT
     a."Year",
     a."Rarity",
     a."Track",
+    a."LabID",
     ac."Expression",
     ac."IsEnabled"
 FROM "achievements" a
