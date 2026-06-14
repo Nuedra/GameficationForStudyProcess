@@ -19,6 +19,8 @@ SELECT
     a."Id",
     a."Title",
     a."Year",
+    a."Rarity",
+    a."Track",
     ac."Expression",
     ac."IsEnabled"
 FROM "achievements" a

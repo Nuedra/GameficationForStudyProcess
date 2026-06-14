@@ -1,7 +1,7 @@
 namespace Platform.Core.Models;
-public class AchievementConnetion
+public class AchievementConnection
 {
-    private AchievementConnetion (Guid id, Guid sourceId, Achievement source, Guid targetId, Achievement target)
+    private AchievementConnection(Guid id, Guid sourceId, Achievement source, Guid targetId, Achievement target)
     {
         Id = id;
         SourceId = sourceId;

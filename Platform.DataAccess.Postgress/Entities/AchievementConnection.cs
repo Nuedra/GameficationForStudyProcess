@@ -1,6 +1,6 @@
 namespace Platform.DataAccess.Postgress
 {
-    public class AchievementConnetionEntity
+    public class AchievementConnectionEntity
     {
         public Guid Id { get; set; }  
         public Guid SourceId { get; set; }

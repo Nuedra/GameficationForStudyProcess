@@ -22,7 +22,7 @@ namespace Platform.DataAccess.Postgress.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("Platform.DataAccess.Postgress.AchievementConnetionEntity", b =>
+            modelBuilder.Entity("Platform.DataAccess.Postgress.AchievementConnectionEntity", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -80,9 +80,21 @@ namespace Platform.DataAccess.Postgress.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
+                    b.Property<string>("Rarity")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("Common");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<string>("Track")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("default");
 
                     b.Property<int>("Year")
                         .HasColumnType("integer");
@@ -177,7 +189,7 @@ namespace Platform.DataAccess.Postgress.Migrations
                     b.ToTable("students", (string)null);
                 });
 
-            modelBuilder.Entity("Platform.DataAccess.Postgress.AchievementConnetionEntity", b =>
+            modelBuilder.Entity("Platform.DataAccess.Postgress.AchievementConnectionEntity", b =>
                 {
                     b.HasOne("Platform.DataAccess.Postgress.AchievementEntity", "Source")
                         .WithMany()
