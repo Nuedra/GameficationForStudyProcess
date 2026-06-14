@@ -8,6 +8,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Platform.Core\Platform.Core.csproj" />
+    <ProjectReference Include="..\Platform.DataAccess.Postgress\Platform.DataAccess.Postgress.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
   </ItemGroup>
 
 </Project>
