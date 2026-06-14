@@ -11,6 +11,10 @@ namespace Platform.DataAccess.Postgress
 
         public DbSet<StudentEntity> Students => Set<StudentEntity>();
         public DbSet<CourseEntity> Courses => Set<CourseEntity>();
+        public DbSet<CourseInstanceEntity> CourseInstances => Set<CourseInstanceEntity>();
+        public DbSet<CourseInstanceStudentEntity> CourseInstanceStudents => Set<CourseInstanceStudentEntity>();
+        public DbSet<EducationalGroupEntity> EducationalGroups => Set<EducationalGroupEntity>();
+        public DbSet<GroupStudentEntity> GroupStudents => Set<GroupStudentEntity>();
         public DbSet<AchievementEntity> Achievements => Set<AchievementEntity>();
         public DbSet<StudentAchievementEntity> StudentAchievements => Set<StudentAchievementEntity>();
         public DbSet<AchievementCriteriaEntity> AchievementCriterias => Set<AchievementCriteriaEntity>();
@@ -20,11 +24,12 @@ namespace Platform.DataAccess.Postgress
         {
             base.OnModelCreating(modelBuilder);
 
-            // Если в Postgres используешь snake_case, удобно включить:
-            // modelBuilder.UseSnakeCaseNamingConvention();
-
             ConfigureStudents(modelBuilder);
             ConfigureCourses(modelBuilder);
+            ConfigureCourseInstances(modelBuilder);
+            ConfigureCourseInstanceStudents(modelBuilder);
+            ConfigureEducationalGroups(modelBuilder);
+            ConfigureGroupStudents(modelBuilder);
             ConfigureAchievements(modelBuilder);
             ConfigureStudentAchievements(modelBuilder);
             ConfigureAchievementCriteria(modelBuilder);
@@ -59,6 +64,8 @@ namespace Platform.DataAccess.Postgress
                 e.Property(x => x.Title).IsRequired();
                 e.Property(x => x.Description).IsRequired(false);
                 e.Property(x => x.AuthorEntity).IsRequired(false);
+                e.Property(x => x.ContentScopeID).IsRequired(false);
+                e.HasIndex(x => x.ContentScopeID).IsUnique();
 
                 // Course -> Achievements (1:N)
                 e.HasMany(x => x.Achievements)
@@ -71,6 +78,89 @@ namespace Platform.DataAccess.Postgress
                  .WithMany()
                  .HasForeignKey(x => x.PreviousID)
                  .OnDelete(DeleteBehavior.SetNull);
+            });
+        }
+
+        private static void ConfigureCourseInstances(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<CourseInstanceEntity>(e =>
+            {
+                e.ToTable("course_instances");
+                e.HasKey(x => new { x.CourseID, x.Year });
+
+                e.Property(x => x.ContentScopeID).IsRequired();
+                e.Property(x => x.CreatedAt)
+                    .IsRequired()
+                    .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                e.HasIndex(x => x.ContentScopeID).IsUnique();
+
+                e.HasOne(x => x.Course)
+                    .WithMany(x => x.Instances)
+                    .HasForeignKey(x => x.CourseID)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+        }
+
+        private static void ConfigureCourseInstanceStudents(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<CourseInstanceStudentEntity>(e =>
+            {
+                e.ToTable("course_instance_students");
+                e.HasKey(x => new { x.CourseID, x.Year, x.PersonID });
+
+                e.Property(x => x.StartDate).IsRequired();
+                e.Property(x => x.EndDate).IsRequired(false);
+
+                e.HasOne(x => x.CourseInstance)
+                    .WithMany(x => x.Students)
+                    .HasForeignKey(x => new { x.CourseID, x.Year })
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(x => x.Student)
+                    .WithMany(x => x.CourseEnrollments)
+                    .HasForeignKey(x => x.PersonID)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+        }
+
+        private static void ConfigureEducationalGroups(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<EducationalGroupEntity>(e =>
+            {
+                e.ToTable("educational_groups");
+                e.HasKey(x => x.GroupName);
+
+                e.Property(x => x.GroupName).IsRequired();
+                e.Property(x => x.GroupCaption).IsRequired();
+                e.Property(x => x.EdProgramID).IsRequired();
+                e.Property(x => x.AdmissionYear).IsRequired();
+                e.Property(x => x.StartDate).IsRequired();
+                e.Property(x => x.EndDate).IsRequired(false);
+            });
+        }
+
+        private static void ConfigureGroupStudents(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<GroupStudentEntity>(e =>
+            {
+                e.ToTable("group_students");
+                e.HasKey(x => new { x.PersonID, x.EdGroupID, x.StartDate });
+
+                e.Property(x => x.EdGroupID).IsRequired();
+                e.Property(x => x.StartDate).IsRequired();
+                e.Property(x => x.EndDate).IsRequired(false);
+
+                e.HasOne(x => x.Student)
+                    .WithMany(x => x.GroupMemberships)
+                    .HasForeignKey(x => x.PersonID)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                e.HasOne(x => x.EducationalGroup)
+                    .WithMany(x => x.Students)
+                    .HasForeignKey(x => x.EdGroupID)
+                    .HasPrincipalKey(x => x.GroupName)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
         }
 
