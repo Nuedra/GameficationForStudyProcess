@@ -96,3 +96,26 @@ docker compose ps
 docker compose logs postgres
 docker compose down
 ```
+
+## Демонстрационные данные студенческого API
+
+После применения миграций загрузите отдельный набор данных:
+
+```bash
+docker exec -i nir-platform-postgres psql -U postgres -d platform < "scripts/sql/03_seed_student_api.sql"
+```
+
+Он создаёт 20 студентов, две группы, два курса с прочтением за 2026 год и
+несколько полученных ачивок.
+
+Для проверки входа можно использовать ID первого студента:
+
+```text
+b0000000-0000-0000-0000-000000000001
+```
+
+Swagger доступен при запуске в Development:
+
+```text
+http://localhost:5284/swagger
+```
