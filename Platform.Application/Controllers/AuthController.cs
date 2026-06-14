@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Platform.Application.Authentication;
 using Platform.Application.Contracts;
 using Platform.Application.Services;
 using Platform.Core.Models;
@@ -53,7 +54,7 @@ public sealed class AuthController(IStudentIdentityService studentIdentityServic
     public async Task<ActionResult<StudentDto>> GetCurrentStudent(
         CancellationToken cancellationToken)
     {
-        if (!TryGetStudentId(out var studentId))
+        if (!User.TryGetUserId(out var studentId))
             return Unauthorized();
 
         var student = await studentIdentityService.FindByIdAsync(studentId, cancellationToken);
@@ -66,12 +67,5 @@ public sealed class AuthController(IStudentIdentityService studentIdentityServic
     {
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         return NoContent();
-    }
-
-    private bool TryGetStudentId(out Guid studentId)
-    {
-        return Guid.TryParse(
-            User.FindFirstValue(ClaimTypes.NameIdentifier),
-            out studentId);
     }
 }

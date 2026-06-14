@@ -41,12 +41,14 @@ builder.Services
         };
     });
 builder.Services.AddAuthorization();
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddDbContext<PlatformDbContext>(options =>
     options.UseNpgsql(
         Environment.GetEnvironmentVariable("PLATFORM_DB_CONNECTION")
         ?? "Host=localhost;Port=5432;Database=platform;Username=postgres;Password=pass"));
 builder.Services.AddScoped<IUserContextService, UserContextService>();
 builder.Services.AddScoped<IStudentIdentityService, StudentIdentityService>();
+builder.Services.AddScoped<IStudentCourseService, StudentCourseService>();
 builder.Services.AddSingleton<IAppraisalPayloadParser, AppraisalPayloadParser>();
 builder.Services.AddSingleton<IAppraisalFactsExtractor, AppraisalFactsExtractor>();
 builder.Services.AddSingleton<IAppraisalPayloadProvider, FixedAppraisalPayloadProvider>();
