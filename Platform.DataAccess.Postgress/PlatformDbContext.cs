@@ -14,7 +14,7 @@ namespace Platform.DataAccess.Postgress
         public DbSet<AchievementEntity> Achievements => Set<AchievementEntity>();
         public DbSet<StudentAchievementEntity> StudentAchievements => Set<StudentAchievementEntity>();
         public DbSet<AchievementCriteriaEntity> AchievementCriterias => Set<AchievementCriteriaEntity>();
-        public DbSet<AchievementConnetionEntity> AchievementConnections => Set<AchievementConnetionEntity>();
+        public DbSet<AchievementConnectionEntity> AchievementConnections => Set<AchievementConnectionEntity>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -84,6 +84,8 @@ namespace Platform.DataAccess.Postgress
                 e.Property(x => x.Title).IsRequired();
                 e.Property(x => x.Description).IsRequired(false);
                 e.Property(x => x.Year).IsRequired();
+                e.Property(x => x.Rarity).IsRequired().HasDefaultValue("Common");
+                e.Property(x => x.Track).IsRequired().HasDefaultValue("default");
 
                 // Achievement -> StudentAchievements (1:N)
                 e.HasMany(x => x.StudentAchievements)
@@ -130,7 +132,7 @@ namespace Platform.DataAccess.Postgress
 
         private static void ConfigureAchievementConnections(ModelBuilder modelBuilder)
         {
-            modelBuilder.Entity<AchievementConnetionEntity>(e =>
+            modelBuilder.Entity<AchievementConnectionEntity>(e =>
             {
                 e.ToTable("achievement_connections");
                 e.HasKey(x => x.Id);

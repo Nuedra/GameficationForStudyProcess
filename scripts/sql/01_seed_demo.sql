@@ -55,13 +55,15 @@ VALUES (
     'IS-101'
 );
 
-INSERT INTO "achievements" ("Id", "Title", "Description", "Year", "CourseID")
+INSERT INTO "achievements" ("Id", "Title", "Description", "Year", "Rarity", "Track", "CourseID")
 VALUES
 (
     '33333333-3333-3333-3333-333333333333',
     'First Login',
     'Student opened the platform for the first time',
     2026,
+    'Common',
+    'default',
     '22222222-2222-2222-2222-222222222222'
 ),
 (
@@ -69,6 +71,8 @@ VALUES
     'First Assignment',
     'Student submitted first assignment',
     2026,
+    'Rare',
+    'semantic',
     '22222222-2222-2222-2222-222222222222'
 );
 

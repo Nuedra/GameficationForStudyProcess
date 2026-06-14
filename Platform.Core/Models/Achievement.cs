@@ -9,6 +9,8 @@ namespace Platform.Core.Models
             entity.Title,
             entity.Description,
             entity.Year,
+            entity.Rarity,
+            entity.Track,
             entity.CourseID,
             entity.Course != null
                 ? new Course(entity.Course)
@@ -22,13 +24,15 @@ namespace Platform.Core.Models
         )
         {
         }
-        private Achievement(Guid id, string title, string description, int year,
+        private Achievement(Guid id, string title, string description, int year, string rarity, string track,
         Guid courseID, Course course, List<StudentAchievement> studentAchievements, AchievementCriteria criteria)
         {
             Id = id;
             Title = title;
             Description = description;
             Year = year;
+            Rarity = rarity;
+            Track = track;
             CourseID = courseID;
             Course = course;
             StudentAchievements = studentAchievements;
@@ -39,10 +43,11 @@ namespace Platform.Core.Models
         public string Title { get;} = string.Empty;
         public string Description { get; } = string.Empty;
         public int Year { get;}
+        public string Rarity { get; } = "Common";
+        public string Track { get; } = "default";
         public Guid CourseID { get; }
         public Course Course { get; }
         public List<StudentAchievement> StudentAchievements { get;} = [];
         public AchievementCriteria Criteria { get; }
     }
 }
-
