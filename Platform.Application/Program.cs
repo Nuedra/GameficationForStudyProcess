@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
+using Platform.Application.Contracts;
 using Platform.Application.Services;
 using Platform.Core.Appraisals;
 using Platform.Core.Processing;
@@ -32,12 +33,12 @@ builder.Services
         options.Events.OnRedirectToLogin = context =>
         {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            return Task.CompletedTask;
+            return context.Response.WriteAsJsonAsync(ApiErrors.AuthenticationRequired);
         };
         options.Events.OnRedirectToAccessDenied = context =>
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
-            return Task.CompletedTask;
+            return context.Response.WriteAsJsonAsync(ApiErrors.CourseAccessDenied);
         };
     });
 builder.Services.AddAuthorization();

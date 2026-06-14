@@ -21,11 +21,11 @@ public sealed class AuthController(IStudentIdentityService studentIdentityServic
         CancellationToken cancellationToken)
     {
         if (request.Id == Guid.Empty)
-            return BadRequest();
+            return BadRequest(ApiErrors.InvalidStudentId);
 
         var student = await studentIdentityService.FindByIdAsync(request.Id, cancellationToken);
         if (student is null)
-            return Unauthorized();
+            return Unauthorized(ApiErrors.InvalidCredentials);
 
         var claims = new[]
         {
@@ -55,10 +55,12 @@ public sealed class AuthController(IStudentIdentityService studentIdentityServic
         CancellationToken cancellationToken)
     {
         if (!User.TryGetUserId(out var studentId))
-            return Unauthorized();
+            return Unauthorized(ApiErrors.AuthenticationRequired);
 
         var student = await studentIdentityService.FindByIdAsync(studentId, cancellationToken);
-        return student is null ? Unauthorized() : Ok(student);
+        return student is null
+            ? Unauthorized(ApiErrors.AuthenticationRequired)
+            : Ok(student);
     }
 
     [HttpPost("logout")]

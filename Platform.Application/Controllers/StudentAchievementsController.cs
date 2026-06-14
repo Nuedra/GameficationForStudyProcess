@@ -19,7 +19,7 @@ public sealed class StudentAchievementsController(
         CancellationToken cancellationToken)
     {
         if (!User.TryGetUserId(out var studentId))
-            return Unauthorized();
+            return Unauthorized(ApiErrors.AuthenticationRequired);
 
         var result = await studentAchievementService.GetEarnedAchievementsAsync(
             studentId,
@@ -30,9 +30,12 @@ public sealed class StudentAchievementsController(
         return result.Status switch
         {
             StudentAchievementsQueryStatus.Success => Ok(result.Data),
-            StudentAchievementsQueryStatus.StudentNotFound => Unauthorized(),
-            StudentAchievementsQueryStatus.CourseNotFound => NotFound(),
-            StudentAchievementsQueryStatus.AccessDenied => Forbid(),
+            StudentAchievementsQueryStatus.StudentNotFound =>
+                Unauthorized(ApiErrors.AuthenticationRequired),
+            StudentAchievementsQueryStatus.CourseNotFound =>
+                NotFound(ApiErrors.CourseNotFound),
+            StudentAchievementsQueryStatus.AccessDenied =>
+                StatusCode(StatusCodes.Status403Forbidden, ApiErrors.CourseAccessDenied),
             _ => StatusCode(StatusCodes.Status500InternalServerError)
         };
     }

@@ -17,7 +17,7 @@ public sealed class StudentCoursesController(IStudentCourseService studentCourse
         CancellationToken cancellationToken)
     {
         if (!User.TryGetUserId(out var studentId))
-            return Unauthorized();
+            return Unauthorized(ApiErrors.AuthenticationRequired);
 
         var courses = await studentCourseService.GetCoursesAsync(
             studentId,
