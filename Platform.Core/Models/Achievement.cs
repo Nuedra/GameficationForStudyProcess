@@ -11,6 +11,7 @@ namespace Platform.Core.Models
             entity.Year,
             entity.Rarity,
             entity.Track,
+            entity.LabID,
             entity.CourseID,
             entity.Course != null
                 ? new Course(entity.Course)
@@ -24,7 +25,7 @@ namespace Platform.Core.Models
         )
         {
         }
-        private Achievement(Guid id, string title, string description, int year, string rarity, string track,
+        private Achievement(Guid id, string title, string description, int year, string rarity, string track, Guid? labID,
         Guid courseID, Course course, List<StudentAchievement> studentAchievements, AchievementCriteria criteria)
         {
             Id = id;
@@ -33,6 +34,7 @@ namespace Platform.Core.Models
             Year = year;
             Rarity = rarity;
             Track = track;
+            LabID = labID;
             CourseID = courseID;
             Course = course;
             StudentAchievements = studentAchievements;
@@ -45,6 +47,7 @@ namespace Platform.Core.Models
         public int Year { get;}
         public string Rarity { get; } = "Common";
         public string Track { get; } = "default";
+        public Guid? LabID { get; }
         public Guid CourseID { get; }
         public Course Course { get; }
         public List<StudentAchievement> StudentAchievements { get;} = [];
