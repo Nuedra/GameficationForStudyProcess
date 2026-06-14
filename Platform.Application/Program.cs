@@ -49,6 +49,7 @@ builder.Services.AddDbContext<PlatformDbContext>(options =>
 builder.Services.AddScoped<IUserContextService, UserContextService>();
 builder.Services.AddScoped<IStudentIdentityService, StudentIdentityService>();
 builder.Services.AddScoped<IStudentCourseService, StudentCourseService>();
+builder.Services.AddScoped<IStudentAchievementService, StudentAchievementService>();
 builder.Services.AddSingleton<IAppraisalPayloadParser, AppraisalPayloadParser>();
 builder.Services.AddSingleton<IAppraisalFactsExtractor, AppraisalFactsExtractor>();
 builder.Services.AddSingleton<IAppraisalPayloadProvider, FixedAppraisalPayloadProvider>();
