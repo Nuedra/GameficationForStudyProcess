@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.Models;
 using Platform.Application.Contracts;
 using Platform.Application.Services;
 using Platform.Core.Appraisals;
@@ -12,6 +13,23 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Gamification Platform API",
+        Version = "v1",
+        Description = "API для Blazor-клиента платформы учебных ачивок."
+    });
+    options.AddSecurityDefinition("studentCookie", new OpenApiSecurityScheme
+    {
+        Type = SecuritySchemeType.ApiKey,
+        In = ParameterLocation.Cookie,
+        Name = "Platform.Student",
+        Description = "Cookie создаётся запросом POST /api/auth/student/login."
+    });
+});
 builder.Services
     .AddControllers()
     .AddJsonOptions(options =>
@@ -66,6 +84,11 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
     app.UseHsts();
+}
+else
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 
 app.UseHttpsRedirection();
