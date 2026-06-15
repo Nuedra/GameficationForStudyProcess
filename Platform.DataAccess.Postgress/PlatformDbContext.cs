@@ -221,6 +221,13 @@ namespace Platform.DataAccess.Postgress
 
                 e.Property(x => x.Expression).IsRequired();
                 e.Property(x => x.IsEnabled).IsRequired();
+                e.Property(x => x.Scope)
+                    .HasConversion<string>()
+                    .IsRequired()
+                    .HasDefaultValue(AchievementCriteriaScope.SameMark);
+                e.ToTable(table => table.HasCheckConstraint(
+                    "CK_achievement_criterias_Scope",
+                    "\"Scope\" IN ('SameMark', 'AcrossCourse', 'AllLabs')"));
             });
         }
 
