@@ -119,6 +119,9 @@ public sealed class AchievementProcessingCycle
                 Id = Guid.NewGuid(),
                 StudentID = studentId,
                 AchievementID = achievement.Id,
+                LabID = achievement.Criteria.Scope == AchievementCriteriaScope.SameMark
+                    ? achievement.LabID
+                    : null,
                 AchievementGotDate = GetAchievementGotDate(achievement, facts, now),
                 AchievementFoundDate = now,
                 IsNotificationSeen = false,
@@ -191,9 +194,20 @@ public sealed class AchievementProcessingCycle
 
     internal static bool IsMatch(AchievementEntity achievement, StudentCourseFacts facts)
     {
-        return achievement.CourseID == facts.CourseId &&
-               achievement.Year == facts.Year &&
-               facts.Marks.Any(mark => AchievementTagMatcher.IsMatch(achievement.Criteria.Expression, mark.Tags));
+        if (achievement.CourseID != facts.CourseId || achievement.Year != facts.Year)
+            return false;
+
+        return achievement.Criteria.Scope switch
+        {
+            AchievementCriteriaScope.SameMark => facts.Marks
+                .Where(mark => !achievement.LabID.HasValue || mark.ColumnId == achievement.LabID.Value)
+                .Any(mark => AchievementTagMatcher.IsMatch(achievement.Criteria.Expression, mark.Tags)),
+            AchievementCriteriaScope.AcrossCourse => AchievementTagMatcher.IsMatch(
+                achievement.Criteria.Expression,
+                facts.Marks.SelectMany(mark => mark.Tags)),
+            AchievementCriteriaScope.AllLabs => AllLabsMatch(achievement, facts),
+            _ => false
+        };
     }
 
     internal static DateTime GetAchievementGotDate(
@@ -202,19 +216,95 @@ public sealed class AchievementProcessingCycle
         DateTime fallback)
     {
         var requiredTags = AchievementTagMatcher.ParseExpression(achievement.Criteria.Expression);
-
-        return facts
+        var courseMarks = facts
             .Where(courseFacts =>
                 courseFacts.CourseId == achievement.CourseID &&
                 courseFacts.Year == achievement.Year)
             .SelectMany(courseFacts => courseFacts.Marks)
-            .Where(mark => requiredTags.All(requiredTag =>
-                mark.Tags.Contains(requiredTag, StringComparer.Ordinal)))
-            .Select(mark => mark.UploadedAt ?? mark.UpdatedAt)
+            .ToList();
+
+        return achievement.Criteria.Scope switch
+        {
+            AchievementCriteriaScope.SameMark => GetSameMarkGotDate(
+                achievement,
+                courseMarks,
+                requiredTags,
+                fallback),
+            AchievementCriteriaScope.AcrossCourse => GetAcrossCourseGotDate(
+                courseMarks,
+                requiredTags,
+                fallback),
+            AchievementCriteriaScope.AllLabs => GetAllLabsGotDate(
+                courseMarks,
+                fallback),
+            _ => fallback
+        };
+    }
+
+    private static DateTime GetSameMarkGotDate(
+        AchievementEntity achievement,
+        IEnumerable<MarkFact> marks,
+        IReadOnlySet<string> requiredTags,
+        DateTime fallback)
+    {
+        return marks
+            .Where(mark => !achievement.LabID.HasValue || mark.ColumnId == achievement.LabID.Value)
+            .Where(mark => HasAllTags(mark, requiredTags))
+            .Select(GetMarkDate)
             .Where(date => date.HasValue)
-            .Select(date => date!.Value.UtcDateTime)
+            .Select(date => date!.Value)
             .DefaultIfEmpty(fallback)
             .Min();
+    }
+
+    private static DateTime GetAcrossCourseGotDate(
+        IReadOnlyList<MarkFact> marks,
+        IReadOnlySet<string> requiredTags,
+        DateTime fallback)
+    {
+        var tagCompletionDates = requiredTags
+            .Select(requiredTag => marks
+                .Where(mark => mark.Tags.Contains(requiredTag, StringComparer.Ordinal))
+                .Select(GetMarkDate)
+                .Where(date => date.HasValue)
+                .Select(date => date!.Value)
+                .DefaultIfEmpty(fallback)
+                .Min());
+
+        return tagCompletionDates.DefaultIfEmpty(fallback).Max();
+    }
+
+    private static DateTime GetAllLabsGotDate(
+        IEnumerable<MarkFact> marks,
+        DateTime fallback)
+    {
+        return marks
+            .Select(GetMarkDate)
+            .Where(date => date.HasValue)
+            .Select(date => date!.Value)
+            .DefaultIfEmpty(fallback)
+            .Max();
+    }
+
+    private static bool HasAllTags(MarkFact mark, IReadOnlySet<string> requiredTags)
+    {
+        return requiredTags.All(requiredTag =>
+            mark.Tags.Contains(requiredTag, StringComparer.Ordinal));
+    }
+
+    private static bool AllLabsMatch(AchievementEntity achievement, StudentCourseFacts facts)
+    {
+        var labs = facts.Marks;
+
+        return labs.Count > 0 &&
+               labs.All(mark => AchievementTagMatcher.IsMatch(
+                   achievement.Criteria.Expression,
+                   mark.Tags));
+    }
+
+    private static DateTime? GetMarkDate(MarkFact mark)
+    {
+        return (mark.UploadedAt ?? mark.UpdatedAt)?.UtcDateTime;
     }
 }
 
