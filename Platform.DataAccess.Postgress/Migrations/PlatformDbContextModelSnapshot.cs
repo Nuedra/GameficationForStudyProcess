@@ -96,7 +96,7 @@ namespace Platform.DataAccess.Postgress.Migrations
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasColumnType("text")
-                        .HasDefaultValue("Common");
+                        .HasDefaultValue("common");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -117,7 +117,10 @@ namespace Platform.DataAccess.Postgress.Migrations
 
                     b.HasIndex("LabID");
 
-                    b.ToTable("achievements", (string)null);
+                    b.ToTable("achievements", t =>
+                        {
+                            t.HasCheckConstraint("CK_achievements_Rarity", "\"Rarity\" IN ('common', 'rare', 'epic', 'legendary')");
+                        });
                 });
 
             modelBuilder.Entity("Platform.DataAccess.Postgress.CourseEntity", b =>

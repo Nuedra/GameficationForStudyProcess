@@ -25,7 +25,8 @@ namespace Platform.Core.Models
         )
         {
         }
-        private Achievement(Guid id, string title, string description, int year, string rarity, string track, Guid? labID,
+        private Achievement(Guid id, string title, string description, int year,
+        Platform.DataAccess.Postgress.AchievementRarity rarity, string track, Guid? labID,
         Guid courseID, Course course, List<StudentAchievement> studentAchievements, AchievementCriteria criteria)
         {
             Id = id;
@@ -45,7 +46,7 @@ namespace Platform.Core.Models
         public string Title { get;} = string.Empty;
         public string Description { get; } = string.Empty;
         public int Year { get;}
-        public string Rarity { get; } = "Common";
+        public Platform.DataAccess.Postgress.AchievementRarity Rarity { get; }
         public string Track { get; } = "default";
         public Guid? LabID { get; }
         public Guid CourseID { get; }
