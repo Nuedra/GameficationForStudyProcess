@@ -35,10 +35,12 @@ public sealed class AppraisalFactsExtractorTests
         Assert.Equal(9, mark.Score);
         Assert.Equal("Иванов И.И.", mark.ScoreSourceName);
         Assert.Equal(DateTimeOffset.Parse("2025-10-20T14:35:00Z"), mark.UpdatedAt);
-        Assert.Equal(3, mark.Tags.Count);
+        Assert.Equal(5, mark.Tags.Count);
         Assert.Contains("lab1_completed", mark.Tags);
         Assert.Contains("lab1_success", mark.Tags);
         Assert.Contains("intime", mark.Tags);
+        Assert.Contains("passed", mark.Tags);
+        Assert.Contains("highscore", mark.Tags);
         Assert.Equal(DateTimeOffset.Parse("2025-10-19T20:59:59Z"), mark.Deadline);
         Assert.Equal(DateTimeOffset.Parse("2025-10-18T16:20:00Z"), mark.UploadedAt);
     }
@@ -81,8 +83,129 @@ public sealed class AppraisalFactsExtractorTests
         var mark = facts.Marks[2];
 
         Assert.Contains("maxscore", mark.Tags);
+        Assert.Contains("passed", mark.Tags);
+        Assert.Contains("expired", mark.Tags);
         Assert.DoesNotContain("intime", mark.Tags);
         Assert.Equal(1, mark.Tags.Count(tag => tag == "maxscore"));
+    }
+
+    [Theory]
+    [InlineData(100, "maxscore")]
+    [InlineData(99, "highscore")]
+    [InlineData(90, "highscore")]
+    [InlineData(89, "goodscore")]
+    [InlineData(80, "goodscore")]
+    [InlineData(79, "mediumscore")]
+    [InlineData(70, "mediumscore")]
+    [InlineData(69, "lowscore")]
+    [InlineData(60, "lowscore")]
+    public void Extract_AddsScoreRangeTag(decimal score, string expectedTag)
+    {
+        var mark = ExtractSingleMark(CreateMark(score));
+
+        Assert.Contains(expectedTag, mark.Tags);
+        Assert.Equal(
+            1,
+            mark.Tags.Count(tag => tag is
+                "maxscore" or "highscore" or "goodscore" or "mediumscore" or "lowscore"));
+    }
+
+    [Theory]
+    [InlineData(60, true)]
+    [InlineData(59, false)]
+    public void Extract_AddsPassedOnlyAtOrAboveMinimum(decimal score, bool expectedPassed)
+    {
+        var mark = ExtractSingleMark(CreateMark(score));
+
+        Assert.Equal(expectedPassed, mark.Tags.Contains("passed"));
+    }
+
+    [Fact]
+    public void Extract_ScoreBelowSixtyPercent_HasNoScoreRangeTag()
+    {
+        var mark = ExtractSingleMark(CreateMark(59));
+
+        Assert.DoesNotContain(
+            mark.Tags,
+            tag => tag is "maxscore" or "highscore" or "goodscore" or "mediumscore" or "lowscore");
+    }
+
+    [Fact]
+    public void Extract_MissingScore_HasNoScoreTags()
+    {
+        var mark = ExtractSingleMark(CreateMark(null));
+
+        Assert.DoesNotContain("passed", mark.Tags);
+        Assert.DoesNotContain(
+            mark.Tags,
+            tag => tag is "maxscore" or "highscore" or "goodscore" or "mediumscore" or "lowscore");
+    }
+
+    [Fact]
+    public void Extract_UploadedAfterDeadline_AddsExpired()
+    {
+        var dto = CreateMark(80);
+        dto = new AppraisalMarkDto
+        {
+            ColumnId = dto.ColumnId,
+            ColumnName = dto.ColumnName,
+            IsComputed = dto.IsComputed,
+            MaxScore = dto.MaxScore,
+            MinAcceptScore = dto.MinAcceptScore,
+            Score = dto.Score,
+            Deadline = DateTimeOffset.Parse("2026-01-01T10:00:00Z"),
+            UploadedAt = DateTimeOffset.Parse("2026-01-01T10:00:01Z")
+        };
+
+        var mark = ExtractSingleMark(dto);
+
+        Assert.Contains("expired", mark.Tags);
+        Assert.DoesNotContain("intime", mark.Tags);
+    }
+
+    [Fact]
+    public void Extract_UploadedAtDeadline_AddsIntime()
+    {
+        var deadline = DateTimeOffset.Parse("2026-01-01T10:00:00Z");
+        var dto = CreateMark(80);
+        dto = new AppraisalMarkDto
+        {
+            ColumnId = dto.ColumnId,
+            ColumnName = dto.ColumnName,
+            IsComputed = dto.IsComputed,
+            MaxScore = dto.MaxScore,
+            MinAcceptScore = dto.MinAcceptScore,
+            Score = dto.Score,
+            Deadline = deadline,
+            UploadedAt = deadline
+        };
+
+        var mark = ExtractSingleMark(dto);
+
+        Assert.Contains("intime", mark.Tags);
+        Assert.DoesNotContain("expired", mark.Tags);
+    }
+
+    private static MarkFact ExtractSingleMark(AppraisalMarkDto mark)
+    {
+        var payload = CreatePayload();
+        payload.AppraisalLists[0].Marks.Clear();
+        payload.AppraisalLists[0].Marks.Add(mark);
+
+        return Assert.Single(new AppraisalFactsExtractor().Extract(payload).Marks);
+    }
+
+    private static AppraisalMarkDto CreateMark(decimal? score)
+    {
+        return new AppraisalMarkDto
+        {
+            ColumnId = Guid.NewGuid(),
+            ColumnName = "Лабораторная работа",
+            IsComputed = false,
+            MaxScore = 100,
+            MinAcceptScore = 60,
+            Score = score
+        };
     }
 
     private static AppraisalPayloadDto CreatePayload()
