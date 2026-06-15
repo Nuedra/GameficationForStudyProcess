@@ -174,10 +174,18 @@ namespace Platform.DataAccess.Postgress
                 e.Property(x => x.Title).IsRequired();
                 e.Property(x => x.Description).IsRequired(false);
                 e.Property(x => x.Year).IsRequired();
-                e.Property(x => x.Rarity).IsRequired().HasDefaultValue("Common");
+                e.Property(x => x.Rarity)
+                    .HasConversion(
+                        rarity => rarity.ToString().ToLowerInvariant(),
+                        value => Enum.Parse<AchievementRarity>(value, true))
+                    .IsRequired()
+                    .HasDefaultValue(AchievementRarity.Common);
                 e.Property(x => x.Track).IsRequired().HasDefaultValue("default");
                 e.Property(x => x.LabID).IsRequired(false);
                 e.HasIndex(x => x.LabID);
+                e.ToTable(table => table.HasCheckConstraint(
+                    "CK_achievements_Rarity",
+                    "\"Rarity\" IN ('common', 'rare', 'epic', 'legendary')"));
 
                 // Achievement -> StudentAchievements (1:N)
                 e.HasMany(x => x.StudentAchievements)
@@ -221,6 +229,13 @@ namespace Platform.DataAccess.Postgress
 
                 e.Property(x => x.Expression).IsRequired();
                 e.Property(x => x.IsEnabled).IsRequired();
+                e.Property(x => x.Scope)
+                    .HasConversion<string>()
+                    .IsRequired()
+                    .HasDefaultValue(AchievementCriteriaScope.SameMark);
+                e.ToTable(table => table.HasCheckConstraint(
+                    "CK_achievement_criterias_Scope",
+                    "\"Scope\" IN ('SameMark', 'AcrossCourse', 'AllLabs')"));
             });
         }
 

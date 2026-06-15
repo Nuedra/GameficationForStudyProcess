@@ -60,12 +60,21 @@ namespace Platform.DataAccess.Postgress.Migrations
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("SameMark");
+
                     b.HasKey("Id");
 
                     b.HasIndex("AchievementID")
                         .IsUnique();
 
-                    b.ToTable("achievement_criterias", (string)null);
+                    b.ToTable("achievement_criterias", t =>
+                        {
+                            t.HasCheckConstraint("CK_achievement_criterias_Scope", "\"Scope\" IN ('SameMark', 'AcrossCourse', 'AllLabs')");
+                        });
                 });
 
             modelBuilder.Entity("Platform.DataAccess.Postgress.AchievementEntity", b =>
@@ -87,7 +96,7 @@ namespace Platform.DataAccess.Postgress.Migrations
                         .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasColumnType("text")
-                        .HasDefaultValue("Common");
+                        .HasDefaultValue("common");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -108,7 +117,10 @@ namespace Platform.DataAccess.Postgress.Migrations
 
                     b.HasIndex("LabID");
 
-                    b.ToTable("achievements", (string)null);
+                    b.ToTable("achievements", t =>
+                        {
+                            t.HasCheckConstraint("CK_achievements_Rarity", "\"Rarity\" IN ('common', 'rare', 'epic', 'legendary')");
+                        });
                 });
 
             modelBuilder.Entity("Platform.DataAccess.Postgress.CourseEntity", b =>

@@ -62,7 +62,7 @@ VALUES
     'First Login',
     'Student opened the platform for the first time',
     2026,
-    'Common',
+    'common',
     'default',
     NULL,
     '22222222-2222-2222-2222-222222222222'

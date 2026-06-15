@@ -6,6 +6,20 @@ namespace Platform.Core.Tests.DataAccess;
 public sealed class PlatformDbContextModelTests
 {
     [Fact]
+    public void AchievementRarity_IsStoredAsLowercaseStringWithCommonDefault()
+    {
+        using var dbContext = CreateDbContext();
+        var entity = dbContext.Model.FindEntityType(typeof(AchievementEntity));
+        var rarity = entity!.FindProperty(nameof(AchievementEntity.Rarity))!;
+        var converter = rarity.GetValueConverter()!;
+
+        Assert.Equal(typeof(string), converter.ProviderClrType);
+        Assert.Equal("common", converter.ConvertToProvider(AchievementRarity.Common));
+        Assert.Equal(AchievementRarity.Legendary, converter.ConvertFromProvider("legendary"));
+        Assert.Equal(AchievementRarity.Common, rarity.GetDefaultValue());
+    }
+
+    [Fact]
     public void CourseInstance_UsesCourseAndYearAsCompositeKey()
     {
         using var dbContext = CreateDbContext();

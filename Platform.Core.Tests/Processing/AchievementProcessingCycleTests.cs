@@ -10,18 +10,20 @@ public sealed class AchievementProcessingCycleTests
     private static readonly Guid CourseId = Guid.Parse("11111111-1111-1111-1111-111111111111");
     private static readonly Guid OtherCourseId = Guid.Parse("22222222-2222-2222-2222-222222222222");
     private static readonly Guid StudentId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+    private static readonly Guid LabId = Guid.Parse("44444444-4444-4444-4444-444444444444");
+    private static readonly Guid OtherLabId = Guid.Parse("55555555-5555-5555-5555-555555555555");
 
     [Fact]
     public async Task RunAsync_MatchingTags_AssignsAchievementAndSetsFields()
     {
         var databaseName = Guid.NewGuid().ToString();
-        var achievement = CreateAchievement("tag1, tag2");
+        var achievement = CreateAchievement("tag1, tag2", labId: LabId);
         await SeedDatabase(databaseName, achievement);
         var uploadedAt = DateTimeOffset.Parse("2026-03-01T10:00:00Z");
         var foundAt = DateTimeOffset.Parse("2026-06-10T12:00:00Z");
         var cycle = CreateCycle(
             databaseName,
-            CreatePayload(["tag1", "tag2"], uploadedAt),
+            CreatePayload(["tag1", "tag2"], uploadedAt, LabId),
             foundAt);
 
         var result = await cycle.RunAsync(StudentId);
@@ -31,6 +33,7 @@ public sealed class AchievementProcessingCycleTests
         var assigned = Assert.Single(await db.StudentAchievements.ToListAsync());
         Assert.Equal(StudentId, assigned.StudentID);
         Assert.Equal(achievement.Id, assigned.AchievementID);
+        Assert.Equal(LabId, assigned.LabID);
         Assert.Equal(uploadedAt.UtcDateTime, assigned.AchievementGotDate);
         Assert.Equal(foundAt.UtcDateTime, assigned.AchievementFoundDate);
         Assert.False(assigned.IsNotificationSeen);
@@ -59,6 +62,27 @@ public sealed class AchievementProcessingCycleTests
     }
 
     [Fact]
+    public async Task RunAsync_NonSameMarkAchievement_DoesNotSetLabId()
+    {
+        var databaseName = Guid.NewGuid().ToString();
+        var achievement = CreateAchievement(
+            "tag1",
+            AchievementCriteriaScope.AcrossCourse,
+            LabId);
+        await SeedDatabase(databaseName, achievement);
+        var cycle = CreateCycle(
+            databaseName,
+            CreatePayload(["tag1"], DateTimeOffset.Parse("2026-03-01T10:00:00Z"), OtherLabId),
+            DateTimeOffset.Parse("2026-06-10T12:00:00Z"));
+
+        await cycle.RunAsync(StudentId);
+
+        await using var db = CreateDbContext(databaseName);
+        var assigned = Assert.Single(await db.StudentAchievements.ToListAsync());
+        Assert.Null(assigned.LabID);
+    }
+
+    [Fact]
     public void IsMatch_AllRequiredTagsExistInOneLab_ReturnsTrue()
     {
         var achievement = CreateAchievement("tag1, tag2");
@@ -81,6 +105,97 @@ public sealed class AchievementProcessingCycleTests
             2026,
             CreateMark(["tag1"]),
             CreateMark(["tag2"]));
+
+        var result = AchievementProcessingCycle.IsMatch(achievement, facts);
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void IsMatch_SameMarkWithLabId_OnlyChecksSpecifiedLab()
+    {
+        var achievement = CreateAchievement("tag1", labId: LabId);
+        var facts = CreateFacts(
+            CourseId,
+            2026,
+            CreateMark(["tag1"], columnId: OtherLabId),
+            CreateMark(["other"], columnId: LabId));
+
+        var result = AchievementProcessingCycle.IsMatch(achievement, facts);
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void IsMatch_AcrossCourse_RequiredTagsCanBeSplitBetweenLabs()
+    {
+        var achievement = CreateAchievement(
+            "tag1, tag2",
+            AchievementCriteriaScope.AcrossCourse);
+        var facts = CreateFacts(
+            CourseId,
+            2026,
+            CreateMark(["tag1"]),
+            CreateMark(["tag2"]));
+
+        var result = AchievementProcessingCycle.IsMatch(achievement, facts);
+
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void IsMatch_AcrossCourse_IgnoresAchievementLabId()
+    {
+        var achievement = CreateAchievement(
+            "tag1, tag2",
+            AchievementCriteriaScope.AcrossCourse,
+            LabId);
+        var facts = CreateFacts(
+            CourseId,
+            2026,
+            CreateMark(["tag1"], columnId: OtherLabId),
+            CreateMark(["tag2"], columnId: OtherLabId));
+
+        var result = AchievementProcessingCycle.IsMatch(achievement, facts);
+
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void IsMatch_AllLabs_AllMarksMustMatch()
+    {
+        var achievement = CreateAchievement("maxscore", AchievementCriteriaScope.AllLabs);
+        var facts = CreateFacts(
+            CourseId,
+            2026,
+            CreateMark(["maxscore"]),
+            CreateMark(["maxscore"]));
+
+        var result = AchievementProcessingCycle.IsMatch(achievement, facts);
+
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void IsMatch_AllLabs_OneNonMatchingLabReturnsFalse()
+    {
+        var achievement = CreateAchievement("maxscore", AchievementCriteriaScope.AllLabs);
+        var facts = CreateFacts(
+            CourseId,
+            2026,
+            CreateMark(["maxscore"]),
+            CreateMark(["other"]));
+
+        var result = AchievementProcessingCycle.IsMatch(achievement, facts);
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void IsMatch_AllLabs_NoLabsReturnsFalse()
+    {
+        var achievement = CreateAchievement("maxscore", AchievementCriteriaScope.AllLabs);
+        var facts = CreateFacts(CourseId, 2026);
 
         var result = AchievementProcessingCycle.IsMatch(achievement, facts);
 
@@ -122,6 +237,46 @@ public sealed class AchievementProcessingCycleTests
             CreateMark(["tag1"], uploadedAt: DateTimeOffset.Parse("2026-02-01T10:00:00Z")),
             CreateMark(["tag1", "tag2"], uploadedAt: DateTimeOffset.Parse("2026-03-05T10:00:00Z")),
             CreateMark(["tag1", "tag2"], uploadedAt: expected));
+
+        var result = AchievementProcessingCycle.GetAchievementGotDate(
+            achievement,
+            [facts],
+            DateTime.Parse("2026-06-01T00:00:00Z").ToUniversalTime());
+
+        Assert.Equal(expected.UtcDateTime, result);
+    }
+
+    [Fact]
+    public void GetAchievementGotDate_AcrossCourse_UsesDateWhenLastRequiredTagAppeared()
+    {
+        var achievement = CreateAchievement(
+            "tag1, tag2",
+            AchievementCriteriaScope.AcrossCourse);
+        var expected = DateTimeOffset.Parse("2026-03-05T10:00:00Z");
+        var facts = CreateFacts(
+            CourseId,
+            2026,
+            CreateMark(["tag1"], uploadedAt: DateTimeOffset.Parse("2026-02-01T10:00:00Z")),
+            CreateMark(["tag2"], uploadedAt: expected));
+
+        var result = AchievementProcessingCycle.GetAchievementGotDate(
+            achievement,
+            [facts],
+            DateTime.Parse("2026-06-01T00:00:00Z").ToUniversalTime());
+
+        Assert.Equal(expected.UtcDateTime, result);
+    }
+
+    [Fact]
+    public void GetAchievementGotDate_AllLabs_UsesLatestLabDate()
+    {
+        var achievement = CreateAchievement("maxscore", AchievementCriteriaScope.AllLabs);
+        var expected = DateTimeOffset.Parse("2026-03-05T10:00:00Z");
+        var facts = CreateFacts(
+            CourseId,
+            2026,
+            CreateMark(["maxscore"], uploadedAt: DateTimeOffset.Parse("2026-02-01T10:00:00Z")),
+            CreateMark(["maxscore"], uploadedAt: expected));
 
         var result = AchievementProcessingCycle.GetAchievementGotDate(
             achievement,
@@ -203,14 +358,18 @@ public sealed class AchievementProcessingCycleTests
         Assert.Empty(result);
     }
 
-    private static AchievementEntity CreateAchievement(string expression)
+    private static AchievementEntity CreateAchievement(
+        string expression,
+        AchievementCriteriaScope scope = AchievementCriteriaScope.SameMark,
+        Guid? labId = null)
     {
         var achievement = new AchievementEntity
         {
             Id = Guid.NewGuid(),
             Title = expression,
             CourseID = CourseId,
-            Year = 2026
+            Year = 2026,
+            LabID = labId
         };
 
         achievement.Criteria = new AchievementCriteriaEntity
@@ -219,6 +378,7 @@ public sealed class AchievementProcessingCycleTests
             AchievementID = achievement.Id,
             Achievement = achievement,
             Expression = expression,
+            Scope = scope,
             IsEnabled = true
         };
 
@@ -238,14 +398,15 @@ public sealed class AchievementProcessingCycleTests
 
     private static MarkFact CreateMark(
         IReadOnlyList<string> tags,
-        DateTimeOffset? uploadedAt = null)
+        DateTimeOffset? uploadedAt = null,
+        Guid? columnId = null)
     {
         return new MarkFact
         {
             ListId = Guid.NewGuid(),
             ListName = "List",
             DateCreated = DateTimeOffset.Parse("2026-01-01T00:00:00Z"),
-            ColumnId = Guid.NewGuid(),
+            ColumnId = columnId ?? Guid.NewGuid(),
             ColumnName = "Lab",
             IsComputed = false,
             MaxScore = 10,
@@ -297,7 +458,8 @@ public sealed class AchievementProcessingCycleTests
 
     private static AppraisalPayloadDto CreatePayload(
         IReadOnlyList<string> tags,
-        DateTimeOffset uploadedAt)
+        DateTimeOffset uploadedAt,
+        Guid? columnId = null)
     {
         return new AppraisalPayloadDto
         {
@@ -315,7 +477,7 @@ public sealed class AchievementProcessingCycleTests
                     [
                         new AppraisalMarkDto
                         {
-                            ColumnId = Guid.NewGuid(),
+                            ColumnId = columnId ?? Guid.NewGuid(),
                             ColumnName = "Lab",
                             IsComputed = false,
                             MaxScore = 10,

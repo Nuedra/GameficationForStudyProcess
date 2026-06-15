@@ -47,14 +47,38 @@ public sealed class AppraisalFactsExtractor : IAppraisalFactsExtractor
         var tags = mark.Tags.ToHashSet(StringComparer.Ordinal);
 
         if (mark.UploadedAt.HasValue &&
-            mark.Deadline.HasValue &&
-            mark.UploadedAt.Value <= mark.Deadline.Value)
+            mark.Deadline.HasValue)
         {
-            tags.Add("intime");
+            tags.Add(mark.UploadedAt.Value <= mark.Deadline.Value
+                ? "intime"
+                : "expired");
         }
 
-        if (mark.Score.HasValue && mark.Score.Value == mark.MaxScore)
-            tags.Add("maxscore");
+        if (mark.Score.HasValue)
+        {
+            if (mark.Score.Value >= mark.MinAcceptScore)
+                tags.Add("passed");
+
+            var scorePercent = mark.Score.Value / mark.MaxScore * 100;
+            switch (scorePercent)
+            {
+                case >= 100:
+                    tags.Add("maxscore");
+                    break;
+                case >= 90:
+                    tags.Add("highscore");
+                    break;
+                case >= 80:
+                    tags.Add("goodscore");
+                    break;
+                case >= 70:
+                    tags.Add("mediumscore");
+                    break;
+                case >= 60:
+                    tags.Add("lowscore");
+                    break;
+            }
+        }
 
         return tags.ToList();
     }
