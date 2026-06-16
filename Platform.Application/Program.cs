@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -30,6 +31,11 @@ builder.Services.AddSwaggerGen(options =>
         Name = "Platform.Student",
         Description = "Cookie создаётся запросом POST /api/auth/student/login."
     });
+
+    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    if (File.Exists(xmlPath))
+        options.IncludeXmlComments(xmlPath);
 });
 builder.Services
     .AddControllers()

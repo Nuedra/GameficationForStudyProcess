@@ -14,7 +14,24 @@ public sealed class StudentAchievementsController(
     IStudentAchievementService studentAchievementService,
     IStudentAchievementGraphService studentAchievementGraphService) : ControllerBase
 {
+    /// <summary>
+    /// Возвращает полученные достижения студента по выбранному курсу.
+    /// </summary>
+    /// <remarks>
+    /// Сейчас endpoint отдаёт только уже полученные достижения. Доступные и заблокированные
+    /// достижения вычисляются отдельно для XML-графа.
+    /// </remarks>
+    /// <param name="courseId">ID курса.</param>
+    /// <param name="year">Год экземпляра курса.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
+    /// <returns>Студент, курс и список полученных достижений.</returns>
     [HttpGet]
+    [Produces("application/json")]
+    [ProducesResponseType(typeof(StudentAchievementsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorDto), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiErrorDto), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiErrorDto), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<StudentAchievementsDto>> GetAchievements(
         Guid courseId,
         int year,
@@ -42,7 +59,25 @@ public sealed class StudentAchievementsController(
         };
     }
 
+    /// <summary>
+    /// Возвращает XML-граф достижений студента по выбранному курсу.
+    /// </summary>
+    /// <remarks>
+    /// Сервис берёт XML-шаблон графа и выставляет статусы нод по данным из БД.
+    /// Ноды сопоставляются с достижениями через атрибут `AchievementId` или временный
+    /// вариант `AchivementId` в XML-шаблоне. Ответ предназначен для компонента,
+    /// который будет отрисовывать граф на фронте.
+    /// </remarks>
+    /// <param name="courseId">ID курса.</param>
+    /// <param name="year">Год экземпляра курса.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
+    /// <returns>XML-документ графа со статусами `earned`, `available` и `locked`.</returns>
     [HttpGet("graph")]
+    [ProducesResponseType(typeof(string), StatusCodes.Status200OK, "application/xml")]
+    [ProducesResponseType(typeof(ApiErrorDto), StatusCodes.Status401Unauthorized, "application/json")]
+    [ProducesResponseType(typeof(ApiErrorDto), StatusCodes.Status403Forbidden, "application/json")]
+    [ProducesResponseType(typeof(ApiErrorDto), StatusCodes.Status404NotFound, "application/json")]
+    [ProducesResponseType(typeof(ApiErrorDto), StatusCodes.Status500InternalServerError, "application/json")]
     public async Task<IActionResult> GetAchievementGraph(
         Guid courseId,
         int year,
