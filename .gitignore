@@ -1,6 +1,10 @@
 # Build artifacts
 **/bin/
 **/obj/
+**/dist/
+**/build/
+**/coverage/
+**/node_modules/
 
 # User-specific files
 *.user
@@ -12,6 +16,10 @@
 # IDE folders and settings
 .vs/
 .idea/
+.vscode/
+*.ntvs*
+*.njsproj
+*.sw?
 
 # OS files
 .DS_Store
@@ -21,9 +29,18 @@ Thumbs.db
 *.log
 *.tmp
 *.temp
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
 # Local environment files
 .env
 .env.local
+.env.*.local
 
 graph-3.xml
+
+# Local Graph.Component scratch files
+Graph.Component/*.sln
+Graph.Component/src/components/Metro.ts

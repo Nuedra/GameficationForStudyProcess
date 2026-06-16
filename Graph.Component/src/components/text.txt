@@ -1,0 +1,4 @@
+Size:{"height":600,"width":700};
+Objects:({"type":"rectangle","x":50,"y":50,"width":80,"height":50,"color":"red","rotation":0,"info":"text"},
+{"type":"circle","x":100,"y":150,"radius":25,"color":"blue","rotation":0,"info":"text"})
+Types:()
