@@ -46,6 +46,46 @@ public sealed class StudentAchievementsController(
             year,
             cancellationToken);
 
+        return ToActionResult(result);
+    }
+
+    /// <summary>
+    /// Повторно запускает цикл обработки достижений и возвращает обновлённый XML-граф.
+    /// </summary>
+    /// <remarks>
+    /// Endpoint нужен кнопке "Обновить граф": сервер сначала проверяет доступ студента
+    /// к курсу, затем заново прогоняет цикл выдачи достижений и возвращает тот же XML-граф,
+    /// но уже со свежими статусами нод и рёбер.
+    /// </remarks>
+    /// <param name="courseId">ID курса.</param>
+    /// <param name="year">Год экземпляра курса.</param>
+    /// <param name="cancellationToken">Токен отмены запроса.</param>
+    /// <returns>Обновлённый XML-документ графа со статусами `earned`, `available` и `locked`.</returns>
+    [HttpPost("graph/refresh")]
+    [ProducesResponseType(typeof(string), StatusCodes.Status200OK, "application/xml")]
+    [ProducesResponseType(typeof(ApiErrorDto), StatusCodes.Status401Unauthorized, "application/json")]
+    [ProducesResponseType(typeof(ApiErrorDto), StatusCodes.Status403Forbidden, "application/json")]
+    [ProducesResponseType(typeof(ApiErrorDto), StatusCodes.Status404NotFound, "application/json")]
+    [ProducesResponseType(typeof(ApiErrorDto), StatusCodes.Status500InternalServerError, "application/json")]
+    public async Task<IActionResult> RefreshAchievementGraph(
+        Guid courseId,
+        int year,
+        CancellationToken cancellationToken)
+    {
+        if (!User.TryGetUserId(out var studentId))
+            return Unauthorized(ApiErrors.AuthenticationRequired);
+
+        var result = await studentAchievementGraphService.RefreshGraphXmlAsync(
+            studentId,
+            courseId,
+            year,
+            cancellationToken);
+
+        return ToActionResult(result);
+    }
+
+    private IActionResult ToActionResult(StudentAchievementGraphQueryResult result)
+    {
         return result.Status switch
         {
             StudentAchievementGraphQueryStatus.Success =>

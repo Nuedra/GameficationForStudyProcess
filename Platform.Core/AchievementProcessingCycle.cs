@@ -26,7 +26,7 @@ public sealed class AchievementProcessingCycle
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
-    internal AchievementProcessingCycle(
+    public AchievementProcessingCycle(
         Func<PlatformDbContext> dbContextFactory,
         IAppraisalPayloadProvider payloadProvider,
         IAppraisalFactsExtractor factsExtractor,

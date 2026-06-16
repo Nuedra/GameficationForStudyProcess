@@ -103,8 +103,35 @@ public sealed class StudentApiTests(StudentApiFactory factory)
         Assert.Equal("course_access_denied", error!.Code);
     }
 
+    [Fact]
+    public async Task AchievementGraphRefresh_OwnCourse_RunsProcessingCycleAndReturnsUpdatedXml()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.StudentId);
+
+        var beforeRefresh = await client.GetAsync(
+            $"/api/student/courses/{StudentApiFactory.CourseId}/2026/achievements/graph");
+        var beforeXml = XDocument.Parse(await beforeRefresh.Content.ReadAsStringAsync());
+        Assert.Equal("available", GetNodeStatus(beforeXml, "available"));
+
+        var response = await client.PostAsync(
+            $"/api/student/courses/{StudentApiFactory.CourseId}/2026/achievements/graph/refresh",
+            content: null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/xml", response.Content.Headers.ContentType!.MediaType);
+
+        var xml = await response.Content.ReadAsStringAsync();
+        var document = XDocument.Parse(xml);
+
+        Assert.Equal("earned", GetNodeStatus(document, "available"));
+        Assert.Equal("earned", GetEdgeStatus(document, "edge-earned-available"));
+    }
+
     private HttpClient CreateClient()
     {
+        factory.ResetDatabase();
+
         return factory.CreateClient(new()
         {
             BaseAddress = new Uri("https://localhost"),

@@ -382,6 +382,9 @@ export class Graph {
     private _redrawScheduled = false;
     private _canvas: HTMLCanvasElement | null = null;
     private _ctx: CanvasRenderingContext2D | null = null;
+    private _scale = 1;
+    private _offsetX = 0;
+    private _offsetY = 0;
 
     // Система выбора
     private _selectionManager: SelectionManager;
@@ -443,6 +446,41 @@ export class Graph {
         this._ctx = ctx;
     }
 
+    panBy(deltaX: number, deltaY: number): void {
+        this._offsetX += deltaX;
+        this._offsetY += deltaY;
+        this.requestRedraw();
+    }
+
+    zoomAt(screenX: number, screenY: number, factor: number): void {
+        const nextScale = Math.min(4, Math.max(0.2, this._scale * factor));
+        const graphX = (screenX - this._offsetX) / this._scale;
+        const graphY = (screenY - this._offsetY) / this._scale;
+
+        this._scale = nextScale;
+        this._offsetX = screenX - graphX * this._scale;
+        this._offsetY = screenY - graphY * this._scale;
+        this.requestRedraw();
+    }
+
+    resetViewport(): void {
+        this._scale = 1;
+        this._offsetX = 0;
+        this._offsetY = 0;
+        this.requestRedraw();
+    }
+
+    screenToGraph(x: number, y: number): { x: number; y: number } {
+        return {
+            x: (x - this._offsetX) / this._scale,
+            y: (y - this._offsetY) / this._scale
+        };
+    }
+
+    applyViewport(ctx: CanvasRenderingContext2D): void {
+        ctx.setTransform(this._scale, 0, 0, this._scale, this._offsetX, this._offsetY);
+    }
+
     requestRedraw(): void {
         if (!this._redrawScheduled && this._ctx) {
             this._redrawScheduled = true;
@@ -496,7 +534,16 @@ export class Graph {
     draw_all_canvas(ctx: CanvasRenderingContext2D) {
         if (!this._ctx || !this._canvas) return;
 
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
+        ctx.save();
+        this.applyViewport(ctx);
+
+        for (const edge of this._edges) {
+            if (edge) {
+                edge.draw_canvas(ctx)
+            }
+        }
 
         for (const node of this._nodes) {
             if (node) {
@@ -504,11 +551,7 @@ export class Graph {
             }
         }
 
-        for (const edge of this._edges) {
-            if (edge) {
-                edge.draw_canvas(ctx)
-            }
-        }
+        ctx.restore();
     }
 
     // ==================== API ВЫБОРА (SELECTION) ====================

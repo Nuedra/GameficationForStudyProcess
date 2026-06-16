@@ -4,6 +4,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Platform.Application.Services;
+using Platform.Core.Appraisals;
+using Platform.Core.Processing;
 using Platform.DataAccess.Postgress;
 
 namespace Platform.Application.Tests;
@@ -24,6 +26,7 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
         Guid.Parse("66666666-6666-6666-6666-666666666666");
 
     private readonly string _databaseName = Guid.NewGuid().ToString();
+    private readonly object _databaseLock = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -33,10 +36,25 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<DbContextOptions<PlatformDbContext>>();
             services.RemoveAll<PlatformDbContext>();
             services.RemoveAll<IAchievementGraphTemplateProvider>();
+            services.RemoveAll<IAppraisalPayloadProvider>();
+            services.RemoveAll<AchievementProcessingCycle>();
             services.AddDbContext<PlatformDbContext>(options =>
                 options.UseInMemoryDatabase(_databaseName));
             services.AddSingleton<IAchievementGraphTemplateProvider>(
                 new TestAchievementGraphTemplateProvider());
+            services.AddSingleton<IAppraisalPayloadProvider>(
+                new TestAppraisalPayloadProvider());
+            services.AddScoped(serviceProvider =>
+            {
+                var options = serviceProvider
+                    .GetRequiredService<DbContextOptions<PlatformDbContext>>();
+
+                return new AchievementProcessingCycle(
+                    () => new PlatformDbContext(options),
+                    serviceProvider.GetRequiredService<IAppraisalPayloadProvider>(),
+                    serviceProvider.GetRequiredService<IAppraisalFactsExtractor>(),
+                    TimeProvider.System);
+            });
 
             using var serviceProvider = services.BuildServiceProvider();
             using var scope = serviceProvider.CreateScope();
@@ -44,6 +62,19 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
             dbContext.Database.EnsureCreated();
             Seed(dbContext);
         });
+    }
+
+    public void ResetDatabase()
+    {
+        lock (_databaseLock)
+        {
+            using var scope = Services.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+
+            dbContext.Database.EnsureDeleted();
+            dbContext.Database.EnsureCreated();
+            Seed(dbContext);
+        }
     }
 
     private static void Seed(PlatformDbContext dbContext)
@@ -113,6 +144,16 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
             Course = course,
             Year = 2026
         };
+        var lockedCriteria = new AchievementCriteriaEntity
+        {
+            Id = Guid.NewGuid(),
+            AchievementID = LockedAchievementId,
+            Achievement = lockedAchievement,
+            Expression = "refresh_tag",
+            IsEnabled = true,
+            Scope = AchievementCriteriaScope.SameMark
+        };
+        lockedAchievement.Criteria = lockedCriteria;
 
         dbContext.AddRange(
             student,
@@ -123,6 +164,7 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
             otherCourseInstance,
             earnedAchievement,
             lockedAchievement,
+            lockedCriteria,
             new CourseInstanceStudentEntity
             {
                 CourseID = CourseId,
@@ -189,6 +231,67 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
                   </edge>
                 </graph>
                 """);
+        }
+    }
+
+    private sealed class TestAppraisalPayloadProvider : IAppraisalPayloadProvider
+    {
+        public Task<IReadOnlyList<AppraisalPayloadDto>> GetPayloadsAsync(
+            CancellationToken cancellationToken = default)
+        {
+            IReadOnlyList<AppraisalPayloadDto> payloads =
+            [
+                new AppraisalPayloadDto
+                {
+                    StudentId = StudentId,
+                    CourseId = CourseId,
+                    Year = 2026,
+                    AppraisalLists =
+                    [
+                        new AppraisalListDto
+                        {
+                            ListId = Guid.Parse("88888888-8888-8888-8888-888888888888"),
+                            ListName = "Тестовая ведомость",
+                            DateCreated = new DateTimeOffset(
+                                2026,
+                                3,
+                                1,
+                                0,
+                                0,
+                                0,
+                                TimeSpan.Zero),
+                            DateClosed = null,
+                            Marks =
+                            [
+                                new AppraisalMarkDto
+                                {
+                                    ColumnId = Guid.Parse(
+                                        "99999999-9999-9999-9999-999999999999"),
+                                    ColumnName = "Тестовая лабораторная",
+                                    IsComputed = false,
+                                    MaxScore = 10,
+                                    MinAcceptScore = 6,
+                                    Score = 10,
+                                    ScoreSourceName = "Преподаватель",
+                                    UpdatedAt = new DateTimeOffset(
+                                        2026,
+                                        3,
+                                        2,
+                                        0,
+                                        0,
+                                        0,
+                                        TimeSpan.Zero),
+                                    Tags = ["refresh_tag"],
+                                    Deadline = null,
+                                    UploadedAt = null
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ];
+
+            return Task.FromResult(payloads);
         }
     }
 }

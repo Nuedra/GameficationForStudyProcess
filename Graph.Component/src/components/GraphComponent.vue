@@ -8,12 +8,9 @@
 </template>
 
 <script lang="ts">
-    import { defineComponent, ref, PropType, watch } from 'vue';
+    import { defineComponent, markRaw, ref, PropType, watch } from 'vue';
     import * as Graph from './Graph';
     import * as Dialect from './Dialect';
-    import * as Tests from './tests';
-
-    import * as graphApi from './graphApi';
 
     export default defineComponent({
         name: 'GraphComponent',
@@ -81,17 +78,21 @@
 
         data() {
             return {
-                graph: null as Graph.Graph | null,
-                graph_figures: [] as Graph.DataShapes[],
+                graph: null as any,
+                graph_figures: [] as any[],
                 dialect: null as Dialect.Dialect | null,
-                runTests: true,
-                hoveredFig: null as Graph.DataShapes | null,
-                pre_hoveredFig: null as Graph.DataShapes | null,
-                clickedFig: null as Graph.DataShapes | null,
-                pre_clickedFig: null as Graph.DataShapes | null,
+                hoveredFig: null as any,
+                pre_hoveredFig: null as any,
+                clickedFig: null as any,
+                pre_clickedFig: null as any,
                 xmlCanvasWidth: 800,  // Размер из XML
                 xmlCanvasHeight: 600,  // Размер из XML
-                containerRef: null as HTMLElement | null
+                containerRef: null as HTMLElement | null,
+                isPanning: false,
+                lastPanX: 0,
+                lastPanY: 0,
+                listenersAttached: false,
+                enhancedListenersAttached: false
             };
         },
 
@@ -103,17 +104,13 @@
                 this.setDialect(this.dialectData);
             }
 
+            this.prepareEmptyCanvas();
+
             if (this.xmlData) {
                 this.$nextTick(() => {
                     this.loadGraphFromXml(this.xmlData as string);
                 });
             }
-
-            // Инициализация расширенных обработчиков
-            this.$nextTick(() => {
-                this.setupEnhancedClickHandlers();
-                this.setupSelectionConstraints();
-            });
         },
 
         methods: {
@@ -137,26 +134,6 @@
                 }
             },
 
-            runGraphTests(): void {
-                if (!this.graph || !this.graph_figures.length) {
-                    console.warn('Невозможно запустить тесты: граф не инициализирован');
-                    return;
-                }
-
-                const canvas = this.graphCanvas;
-                const ctx = canvas?.getContext("2d");
-                if (!ctx) {
-                    console.warn('Невозможно запустить тесты: контекст canvas не доступен');
-                    return;
-                }
-
-                try {
-                    Tests.test(ctx, this.graph, this.graph_figures);
-                } catch (error: unknown) {
-                    console.error('Ошибка выполнения тестов:', error);
-                }
-            },
-
             getNodes(): Graph.DataShapes[] {
                 return this.graph ? this.graph._nodes : [];
             },
@@ -168,9 +145,20 @@
             getObjectAt(x: number, y: number): Graph.DataShapes | null {
                 if (!this.graph_figures.length) return null;
 
-                for (let fig_index = this.graph_figures.length - 1; fig_index >= 0; fig_index--) {
-                    const fig = this.graph_figures[fig_index];
-                    if (fig && fig.is_inside(x, y)) {
+                const point = this.graph
+                    ? this.graph.screenToGraph(x, y)
+                    : { x, y };
+
+                const figures = [...this.graph_figures].reverse();
+                const hitCandidates = this.graph
+                    ? [
+                        ...figures.filter(fig => fig?._type !== 'line'),
+                        ...figures.filter(fig => fig?._type === 'line')
+                    ]
+                    : figures;
+
+                for (const fig of hitCandidates) {
+                    if (fig && fig.is_inside(point.x, point.y)) {
                         return fig;
                     }
                 }
@@ -229,8 +217,13 @@
                     this.graph._nodes = [];
                     this.graph._edges = [];
                     this.graph_figures = [];
+                    this.resetInteractiveState();
                     this.graph.requestRedraw();
                 }
+            },
+
+            resetViewport(): void {
+                this.graph?.resetViewport();
             },
 
             getGraphData(): { nodes: any[]; edges: any[] } {
@@ -285,6 +278,8 @@
 
                     canvas.width = newWidth;
                     canvas.height = newHeight;
+                    canvas.style.backgroundColor =
+                        this.getGraphBackgroundColor(xmlDoc) || '#f5f5f5';
 
                     // Проверяем и обновляем диалект если необходимо
                     const dialectName = xmlDoc.getElementsByTagName("graph")[0].getAttribute("dialect");
@@ -378,36 +373,6 @@
                 }
                 return this.xmlCanvasHeight || 600;
             },
-
-            async fetchGraphFromServer(): Promise<void> {
-                try {
-                    const xmlData = await graphApi.getGraphXML();
-                    await this.updateGraphDataXML(xmlData);
-                } catch (error: unknown) {
-                    console.error('Ошибка загрузки графа с сервера:', error);
-                    throw error;
-                }
-            },
-
-            async saveGraphToServer(): Promise<void> {
-                try {
-                    //const graphData = this.getGraphData();
-                    // Можно отправить либо XML, либо структурированные данные
-                    const xmlData = this.exportToXml();
-                    await graphApi.updateGraphFromXML(xmlData);
-                } catch (error: unknown) {
-                    console.error('Ошибка сохранения графа на сервер:', error);
-                    throw error;
-                }
-            },
-
-            async syncWithServer(): Promise<void> {
-                try {
-                    await this.fetchGraphFromServer();
-                } catch (error) {
-                    console.error('Ошибка синхронизации с сервером:', error);
-                }
-            },        
 
             getSelection(): Graph.DataShapes[] {
                 return this.graph ? this.graph.getSelection() : [];
@@ -510,6 +475,8 @@
             setupEnhancedClickHandlers(): void {
                 const canvas = this.graphCanvas;
                 if (!canvas || !this.graph) return;
+                if (this.enhancedListenersAttached) return;
+                this.enhancedListenersAttached = true;
 
                 canvas.addEventListener("click", (event) => {
                     const rect = canvas.getBoundingClientRect();
@@ -593,6 +560,7 @@
                 if (!ctx) throw new Error('Не удалось получить 2D контекст');
 
                 const xmlDoc = this.parseXML(xmlData);
+                this.resetInteractiveState();
 
                 // Определяем размеры канваса с учетом приоритета:
                 let finalWidth = 800;
@@ -632,8 +600,10 @@
                 // Устанавливаем размеры канваса
                 canvas.width = finalWidth;
                 canvas.height = finalHeight;
+                canvas.style.backgroundColor =
+                    this.getGraphBackgroundColor(xmlDoc) || '#f5f5f5';
 
-                this.graph = new Graph.Graph();
+                this.graph = markRaw(new Graph.Graph());
                 this.graph_figures = [];
                 this.graph.bindCanvas(canvas, ctx);
 
@@ -644,12 +614,26 @@
                 this.createNodesFromXml(xmlDoc, customDescriptions);
                 this.createEdgesFromXml(xmlDoc);
 
-                if (this.runTests) {
-                    this.runGraphTests();
-                }
-
                 this.graph.requestRedraw();
+                this.setupEnhancedClickHandlers();
+                this.setupSelectionConstraints();
                 this.setupEventListeners();
+            },
+
+            prepareEmptyCanvas(): void {
+                const canvas = this.graphCanvas;
+                if (!canvas) return;
+
+                canvas.width = this.getCurrentCanvasWidth();
+                canvas.height = this.getCurrentCanvasHeight();
+            },
+
+            resetInteractiveState(): void {
+                this.hoveredFig = null;
+                this.pre_hoveredFig = null;
+                this.clickedFig = null;
+                this.pre_clickedFig = null;
+                this.isPanning = false;
             },
 
             initializeDialect(xmlDoc: Document): void {
@@ -698,6 +682,66 @@
                     }
                 }
                 return arrowType;
+            },
+
+            getStatusState(element: Element): string | undefined {
+                const statusElement = element.getElementsByTagName("status")[0];
+                const state = statusElement?.getAttribute("state") || undefined;
+
+                return state && ["earned", "available", "locked"].includes(state)
+                    ? state
+                    : undefined;
+            },
+
+            getNodeColor(status: string | undefined, fallback: string): string {
+                switch (status) {
+                    case "earned":
+                        return "#4caf50";
+                    case "available":
+                        return "#ffd54f";
+                    case "locked":
+                        return "#cfd8dc";
+                    default:
+                        return fallback;
+                }
+            },
+
+            getEdgeColor(status: string | undefined, fallback: string): string {
+                switch (status) {
+                    case "earned":
+                        return "#2e7d32";
+                    case "available":
+                        return "#f9a825";
+                    case "locked":
+                        return "#90a4ae";
+                    default:
+                        return fallback;
+                }
+            },
+
+            getStatusTooltip(status: string | undefined): string {
+                switch (status) {
+                    case "earned":
+                        return "Достижение получено";
+                    case "available":
+                        return "Достижение доступно";
+                    case "locked":
+                        return "Достижение пока закрыто";
+                    default:
+                        return "";
+                }
+            },
+
+            getGraphBackgroundColor(xmlDoc: Document): string | undefined {
+                const graphElement = xmlDoc.getElementsByTagName("graph")[0];
+                if (!graphElement) return undefined;
+
+                const backgroundElement = Array
+                    .from(graphElement.children)
+                    .find(child => child.tagName === "background");
+                const fillElement = backgroundElement?.getElementsByTagName("fill")[0];
+
+                return fillElement?.getAttribute("color") || undefined;
             },
 
             parseXML(xml_text: string): Document {
@@ -757,6 +801,7 @@
                     const background = node.getElementsByTagName("background")[0];
                     const edgeStyle = node.getElementsByTagName("edgeStyle")[0];
                     const labelSettings = node.getElementsByTagName("labelSettings")[0];
+                    const status = this.getStatusState(node);
 
                     const connectors = this.loadConnectorsForNode(xmlDoc, id);
 
@@ -782,7 +827,9 @@
 
                     if (geometry) {
                         const baseParams = {
-                            id, type, labelInfo, rotation, isEdgeDash, connectors, info,
+                            id, type, labelInfo, rotation, isEdgeDash, connectors,
+                            info: info || this.getStatusTooltip(status),
+                            status,
                             image_src, image_scale, image_rotation
                         };
 
@@ -820,8 +867,14 @@
                 return connectors;
             },
 
-            createNodeObject(type: string, geometry: Element, background: Element, baseParams: any, customDescriptions: Map<string, any>): Graph.DataShapes | null {
-                const color = background.getAttribute("color") || "black";
+            createNodeObject(
+                type: string,
+                geometry: Element,
+                background: Element | undefined,
+                baseParams: any,
+                customDescriptions: Map<string, any>): Graph.DataShapes | null {
+                const baseColor = background?.getAttribute("color") || "black";
+                const color = this.getNodeColor(baseParams.status, baseColor);
                 const params = {
                     ...baseParams,
                     label_info: baseParams.labelInfo,
@@ -951,6 +1004,7 @@
                     const geometry = edge.getElementsByTagName("geometry")[0] || edge.getElementsByTagName("lineGeometry")[0];
                     const background = edge.getElementsByTagName("background")[0];
                     const edgeStyle = edge.getElementsByTagName("edgeStyle")[0];
+                    const status = this.getStatusState(edge);
                     let startArrow = edge.getAttribute("startArrow") || "none";
                     let endArrow = edge.getAttribute("endArrow") || "none";
 
@@ -973,8 +1027,8 @@
                         padding: 10,
                     };
 
-                    const sourceNodeId = edge.getAttribute("sourceNodeId");
-                    const targetNodeId = edge.getAttribute("targetNodeId");
+                    const sourceNodeId = edge.getAttribute("sourceNodeId") || edge.getAttribute("source");
+                    const targetNodeId = edge.getAttribute("targetNodeId") || edge.getAttribute("target");
 
                     type = this.validateEdgeType(type, dialectName);
                     startArrow = this.validateArrowType(startArrow, dialectName);
@@ -985,18 +1039,22 @@
                         const startY = parseFloat(geometry.getAttribute("startY") || "0");
                         const endX = parseFloat(geometry.getAttribute("endX") || "0");
                         const endY = parseFloat(geometry.getAttribute("endY") || "0");
-                        const color = background.getAttribute("color") || "black";
+                        const baseColor = background?.getAttribute("color") || "black";
+                        const color = this.getEdgeColor(status, baseColor);
                         const lineWidth = parseFloat(edgeStyle?.getAttribute("lineWidth") || "1");
 
                         if (edgeStyle) {
                             isEdgeDash = edgeStyle.getAttribute("isEdgeDash") === 'true';
                             is_corners_rounded = edgeStyle.getAttribute("isRounded") === 'true';
                         }
+                        if (status === 'locked') {
+                            isEdgeDash = true;
+                        }
 
                         const max_radius_of_corners = parseFloat(edgeStyle?.getAttribute("maxRadiusOfCorners") || "7");
 
-                        let sourceNode: Graph.DataShapes | null = null;
-                        let targetNode: Graph.DataShapes | null = null;
+                        let sourceNode: Graph.Node | undefined;
+                        let targetNode: Graph.Node | undefined;
 
                         if (sourceNodeId && this.graph) {
                             sourceNode = this.graph.getNode(sourceNodeId);
@@ -1007,7 +1065,8 @@
 
                         const line = new Graph.Line({
                             id, type, startX, startY, endX, endY, color, label_info: labelInfo,
-                            rotation, lineWidth, isEdgeDash, points: internalPoints, info,
+                            rotation, lineWidth, isEdgeDash, points: internalPoints,
+                            info: info || this.getStatusTooltip(status),
                             is_corners_rounded, max_radius_of_corners
                         }, endArrow, startArrow, targetNode, sourceNode);
 
@@ -1063,14 +1122,16 @@
             },
 
             nodeToData(node: Graph.DataShapes): any {
+                const shape = node as any;
+
                 return {
-                    id: node?._id,
-                    type: node?._type,
-                    color: node?._color,
-                    label_info: node?._label_info,
-                    rotation: node?._rotation,
-                    isEdgeDash: node?._isEdgeDash,
-                    info: node?._info
+                    id: shape?._id,
+                    type: shape?._type,
+                    color: shape?._color,
+                    label_info: shape?._label_info,
+                    rotation: shape?._rotation,
+                    isEdgeDash: shape?._isEdgeDash,
+                    info: shape?._info
                 };
             },
 
@@ -1100,6 +1161,8 @@
             setupEventListeners(): void {
                 const canvas = this.graphCanvas;
                 if (!canvas || !this.graph) return;
+                if (this.listenersAttached) return;
+                this.listenersAttached = true;
 
                 // Используем ref вместо getElementById
                 const tooltip = this.tooltipRef;
@@ -1115,47 +1178,34 @@
                     const mouseX = event.clientX - rect.left;
                     const mouseY = event.clientY - rect.top;
 
-                    this.pre_hoveredFig = this.hoveredFig;
-                    this.hoveredFig = null;
-
-                    for (let fig_index = this.graph_figures.length - 1; fig_index >= 0; fig_index--) {
-                        const fig = this.graph_figures[fig_index];
-                        if (fig && fig.is_inside(mouseX, mouseY)) {
-                            this.hoveredFig = fig;
-                            if (tooltip && this.hoveredFig?._info && this.hoveredFig?._info !== "") {
-                                // Позиционируем tooltip относительно контейнера
-                                const tooltipX = event.clientX - containerRect.left + 10;
-                                const tooltipY = event.clientY - containerRect.top + 10;
-
-                                tooltip.textContent = this.hoveredFig._info;
-                                tooltip.style.left = `${tooltipX}px`;
-                                tooltip.style.top = `${tooltipY}px`;
-                                tooltip.style.display = 'block';
-                            }
-                            break;
-                        }
+                    if (this.isPanning && this.graph) {
+                        tooltip.style.display = 'none';
+                        this.graph.panBy(
+                            event.clientX - this.lastPanX,
+                            event.clientY - this.lastPanY);
+                        this.lastPanX = event.clientX;
+                        this.lastPanY = event.clientY;
+                        return;
                     }
 
-                    if (!this.hoveredFig && tooltip) {
+                    this.pre_hoveredFig = this.hoveredFig;
+                    this.hoveredFig = this.getObjectAt(mouseX, mouseY);
+
+                    if (this.hoveredFig?._info && this.hoveredFig._info !== "") {
+                        // Позиционируем tooltip относительно контейнера
+                        const tooltipX = event.clientX - containerRect.left + 10;
+                        const tooltipY = event.clientY - containerRect.top + 10;
+
+                        tooltip.textContent = this.hoveredFig._info;
+                        tooltip.style.left = `${tooltipX}px`;
+                        tooltip.style.top = `${tooltipY}px`;
+                        tooltip.style.display = 'block';
+                    } else {
                         tooltip.style.display = 'none';
                     }
 
                     if (this.hoveredFig !== this.pre_hoveredFig) {
-                        const ctx = canvas.getContext("2d");
-                        if (ctx) {
-                            ctx.clearRect(0, 0, canvas.width, canvas.height);
-                            for (const sh of this.graph_figures) {
-                                if (sh) {
-                                    if (this.clickedFig === sh) {
-                                        sh.draw_clicked(ctx);
-                                    } else if (this.hoveredFig === sh) {
-                                        sh.draw_hovered(ctx);
-                                    } else {
-                                        sh.draw_canvas(ctx);
-                                    }
-                                }
-                            }
-                        }
+                        this.redrawInteractiveState();
                     }
                 });
 
@@ -1165,37 +1215,75 @@
                     const mouseY = event.clientY - rect.top;
 
                     this.pre_clickedFig = this.clickedFig;
-                    this.clickedFig = null;
+                    this.clickedFig = this.getObjectAt(mouseX, mouseY);
 
-                    for (let fig_index = this.graph_figures.length - 1; fig_index >= 0; fig_index--) {
-                        const fig = this.graph_figures[fig_index];
-                        if (fig && fig._type == 'circle') {
-                            if ((fig as Graph.Circle).is_clicked(mouseX, mouseY)) {
-                                this.clickedFig = fig;
-                                break;
-                            }
-                        } else if (fig && fig.is_inside(mouseX, mouseY)) {
-                            this.clickedFig = fig;
-                            break;
-                        }
+                    if (!this.clickedFig && event.button === 0) {
+                        this.isPanning = true;
+                        this.lastPanX = event.clientX;
+                        this.lastPanY = event.clientY;
+                        canvas.style.cursor = "grabbing";
+                        tooltip.style.display = 'none';
+                        return;
                     }
 
                     if (this.pre_clickedFig !== this.clickedFig) {
-                        const ctx = canvas.getContext("2d");
-                        if (ctx) {
-                            ctx.clearRect(0, 0, canvas.width, canvas.height);
-                            for (const sh of this.graph_figures) {
-                                if (sh) {
-                                    if (this.clickedFig === sh) {
-                                        sh.draw_clicked(ctx);
-                                    } else {
-                                        sh.draw_canvas(ctx);
-                                    }
-                                }
-                            }
-                        }
+                        this.redrawInteractiveState();
                     }
                 });
+
+                canvas.addEventListener("mouseup", () => {
+                    this.isPanning = false;
+                    canvas.style.cursor = "default";
+                });
+
+                canvas.addEventListener("mouseleave", () => {
+                    this.isPanning = false;
+                    this.hoveredFig = null;
+                    canvas.style.cursor = "default";
+                    tooltip.style.display = "none";
+                });
+
+                canvas.addEventListener("wheel", (event) => {
+                    event.preventDefault();
+                    const rect = canvas.getBoundingClientRect();
+                    const mouseX = event.clientX - rect.left;
+                    const mouseY = event.clientY - rect.top;
+                    const factor = event.deltaY < 0 ? 1.1 : 0.9;
+
+                    this.graph?.zoomAt(mouseX, mouseY, factor);
+                }, { passive: false });
+            },
+
+            redrawInteractiveState(): void {
+                const canvas = this.graphCanvas;
+                const ctx = canvas?.getContext("2d");
+                if (!canvas || !ctx || !this.graph) return;
+
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.save();
+                this.graph.applyViewport(ctx);
+
+                const drawShape = (shape: Graph.DataShapes): void => {
+                    if (!shape) return;
+
+                    if (this.clickedFig === shape) {
+                        shape.draw_clicked(ctx);
+                    } else if (this.hoveredFig === shape) {
+                        shape.draw_hovered(ctx);
+                    } else {
+                        shape.draw_canvas(ctx);
+                    }
+                };
+
+                this.graph_figures
+                    .filter(shape => shape?._type === 'line')
+                    .forEach(drawShape);
+                this.graph_figures
+                    .filter(shape => shape?._type !== 'line')
+                    .forEach(drawShape);
+
+                ctx.restore();
             }
         },
         watch: {
@@ -1220,14 +1308,13 @@
                         this.loadGraphFromXml(newXml);
                     }
                 },
-                immediate: true
+                immediate: false
             }
         },
 
         expose: [
             'loadGraphFromXml',
             'setDialect',
-            'runGraphTests',
             'getNodes',
             'getEdges',
             'getObjectAt',
@@ -1236,12 +1323,11 @@
             'deleteNode',
             'deleteEdge',
             'clearGraph',
+            'resetViewport',
+            'resetInteractiveState',
             'getGraphData',
             'exportToXml',
             'updateGraphDataXML',
-            'fetchGraphFromServer',
-            'saveGraphToServer',
-            'syncWithServer',
             'getSelection',
             'select',
             'deselect',

@@ -7,6 +7,12 @@ public interface IStudentAchievementGraphService
         Guid courseId,
         int year,
         CancellationToken cancellationToken = default);
+
+    Task<StudentAchievementGraphQueryResult> RefreshGraphXmlAsync(
+        Guid studentId,
+        Guid courseId,
+        int year,
+        CancellationToken cancellationToken = default);
 }
 
 public enum StudentAchievementGraphQueryStatus
