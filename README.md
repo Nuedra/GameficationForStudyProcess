@@ -119,3 +119,75 @@ Swagger доступен при запуске в Development:
 ```text
 http://localhost:5284/swagger
 ```
+
+## Проверка генерации XML-графа достижений
+
+XML-граф строится из шаблона:
+
+```text
+Platform.Application/Templates/achievement-graph.xml
+```
+
+В тестовом seed-файле ID первых достижений синхронизированы с атрибутами
+`AchivementId` в этом шаблоне, поэтому можно проверить реальные статусы нод.
+
+1. Поднимите PostgreSQL и примените миграции, как описано выше.
+
+2. Загрузите seed для студенческого API:
+
+```bash
+docker exec -i nir-platform-postgres psql -U postgres -d platform < "scripts/sql/03_seed_student_api.sql"
+```
+
+3. Запустите приложение:
+
+```bash
+dotnet run --project "Platform.Application/Platform.Application.csproj" --launch-profile http
+```
+
+4. Выполните вход студентом и сохраните cookie:
+
+```bash
+curl -c cookies.txt \
+  -H "Content-Type: application/json" \
+  -d '{"id":"b0000000-0000-0000-0000-000000000001"}' \
+  http://localhost:5284/api/auth/student/login
+```
+
+5. Запросите XML-граф по первому курсу:
+
+```bash
+curl -b cookies.txt \
+  -H "Accept: application/xml" \
+  http://localhost:5284/api/student/courses/a1000000-0000-0000-0000-000000000001/2026/achievements/graph \
+  -o graph-result.xml
+```
+
+6. Откройте полученный файл:
+
+```bash
+open graph-result.xml
+```
+
+Для студента `b0000000-0000-0000-0000-000000000001` по первому курсу ожидаются
+такие статусы:
+
+- `AchivementId="00000000-0000-0000-0000-000000000001"`: `earned`;
+- `AchivementId="00000000-0000-0000-0000-000000000002"`: `earned`;
+- `AchivementId="00000000-0000-0000-0000-000000000003"`: `available`;
+- остальные ноды: `locked`.
+
+Для студента `b0000000-0000-0000-0000-000000000002` по первому курсу ожидается:
+
+- `AchivementId="00000000-0000-0000-0000-000000000001"`: `earned`;
+- `AchivementId="00000000-0000-0000-0000-000000000002"`: `available`;
+- `AchivementId="00000000-0000-0000-0000-000000000003"`: `locked`.
+
+Проверить XML можно также через Swagger:
+
+```text
+http://localhost:5284/swagger
+```
+
+Сначала выполните `POST /api/auth/student/login`, затем
+`GET /api/student/courses/{courseId}/{year}/achievements/graph`.
