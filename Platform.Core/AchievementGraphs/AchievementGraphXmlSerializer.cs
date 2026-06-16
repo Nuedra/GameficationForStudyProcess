@@ -1,12 +1,9 @@
-using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
 namespace Platform.Core.AchievementGraphs;
 
 public sealed class AchievementGraphXmlSerializer : IAchievementGraphXmlSerializer
 {
-    private static readonly Regex WhitespaceRegex = new(@"\s+", RegexOptions.Compiled);
-
     public string Serialize(
         string template,
         IReadOnlyCollection<AchievementGraphNodeState> nodeStates)
@@ -26,29 +23,12 @@ public sealed class AchievementGraphXmlSerializer : IAchievementGraphXmlSerializ
         var statesById = nodeStates.ToDictionary(
             item => item.AchievementId,
             item => item.Status);
-        var statesByGraphNodeId = nodeStates
-            .Where(item => !string.IsNullOrWhiteSpace(item.GraphNodeId))
-            .GroupBy(item => item.GraphNodeId!, StringComparer.Ordinal)
-            .ToDictionary(
-                group => group.Key,
-                group => group.First().Status,
-                StringComparer.Ordinal);
-        var statesByTitle = nodeStates
-            .GroupBy(item => NormalizeLabel(item.Title), StringComparer.Ordinal)
-            .ToDictionary(
-                group => group.Key,
-                group => group.First().Status,
-                StringComparer.Ordinal);
 
         var nodeStatusesByXmlId = new Dictionary<string, AchievementGraphStatus>(StringComparer.Ordinal);
 
         foreach (var node in root.Elements("node"))
         {
-            var status = ResolveNodeStatus(
-                node,
-                statesById,
-                statesByGraphNodeId,
-                statesByTitle);
+            var status = ResolveNodeStatus(node, statesById);
             SetStatus(node, status);
 
             var xmlId = node.Attribute("id")?.Value;
@@ -92,27 +72,11 @@ public sealed class AchievementGraphXmlSerializer : IAchievementGraphXmlSerializ
 
     private static AchievementGraphStatus ResolveNodeStatus(
         XElement node,
-        IReadOnlyDictionary<Guid, AchievementGraphStatus> statesById,
-        IReadOnlyDictionary<string, AchievementGraphStatus> statesByGraphNodeId,
-        IReadOnlyDictionary<string, AchievementGraphStatus> statesByTitle)
+        IReadOnlyDictionary<Guid, AchievementGraphStatus> statesById)
     {
         var achievementId = GetAchievementId(node);
         if (achievementId.HasValue && statesById.TryGetValue(achievementId.Value, out var statusById))
             return statusById;
-
-        var graphNodeId = node.Attribute("id")?.Value;
-        if (!string.IsNullOrWhiteSpace(graphNodeId) &&
-            statesByGraphNodeId.TryGetValue(graphNodeId, out var statusByGraphNodeId))
-        {
-            return statusByGraphNodeId;
-        }
-
-        var label = node.Attribute("label")?.Value;
-        if (!string.IsNullOrWhiteSpace(label) &&
-            statesByTitle.TryGetValue(NormalizeLabel(label), out var statusByTitle))
-        {
-            return statusByTitle;
-        }
 
         return AchievementGraphStatus.Locked;
     }
@@ -122,8 +86,11 @@ public sealed class AchievementGraphXmlSerializer : IAchievementGraphXmlSerializ
         foreach (var attributeName in new[]
                  {
                      "achievementId",
+                     "AchievementId",
                      "achievement-id",
-                     "data-achievement-id"
+                     "data-achievement-id",
+                     "achivementId",
+                     "AchivementId"
                  })
         {
             var value = node.Attribute(attributeName)?.Value;
@@ -190,10 +157,5 @@ public sealed class AchievementGraphXmlSerializer : IAchievementGraphXmlSerializ
             AchievementGraphStatus.Earned => "earned",
             _ => "locked"
         };
-    }
-
-    private static string NormalizeLabel(string value)
-    {
-        return WhitespaceRegex.Replace(value.Replace("\\n", " "), " ").Trim();
     }
 }

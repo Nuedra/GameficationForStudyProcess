@@ -27,7 +27,6 @@ public sealed class AchievementGraphXmlSerializerTests
             [
                 new AchievementGraphNodeState(
                     EarnedAchievementId,
-                    "Другое название",
                     AchievementGraphStatus.Earned)
             ]);
 
@@ -36,13 +35,13 @@ public sealed class AchievementGraphXmlSerializerTests
     }
 
     [Fact]
-    public void Serialize_UpdatesNodeStatusesByLabelWhenAchievementIdIsMissing()
+    public void Serialize_DoesNotUseLabelAsAchievementIdentity()
     {
         var xml = _serializer.Serialize(
             """
             const xmlAchievementsGraph = `
             <graph>
-              <node id="node-1" label="Первый\nкоммит">
+              <node id="node-1" label="Первый коммит">
                 <geometry x="0" y="0"/>
                 <status state="locked"/>
               </node>
@@ -52,36 +51,11 @@ public sealed class AchievementGraphXmlSerializerTests
             [
                 new AchievementGraphNodeState(
                     EarnedAchievementId,
-                    "Первый коммит",
                     AchievementGraphStatus.Available)
             ]);
 
         var document = XDocument.Parse(xml);
-        Assert.Equal("available", GetNodeStatus(document, "node-1"));
-    }
-
-    [Fact]
-    public void Serialize_UpdatesNodeStatusesByGraphNodeId()
-    {
-        var xml = _serializer.Serialize(
-            """
-            <graph>
-              <node id="kqRZZZaIueUMFGOhbLgu-30" label="Название в XML">
-                <geometry x="0" y="0"/>
-                <status state="locked"/>
-              </node>
-            </graph>
-            """,
-            [
-                new AchievementGraphNodeState(
-                    EarnedAchievementId,
-                    "Название в БД",
-                    AchievementGraphStatus.Earned,
-                    "kqRZZZaIueUMFGOhbLgu-30")
-            ]);
-
-        var document = XDocument.Parse(xml);
-        Assert.Equal("earned", GetNodeStatus(document, "kqRZZZaIueUMFGOhbLgu-30"));
+        Assert.Equal("locked", GetNodeStatus(document, "node-1"));
     }
 
     [Fact]
@@ -90,7 +64,7 @@ public sealed class AchievementGraphXmlSerializerTests
         var xml = _serializer.Serialize(
             """
             <graph>
-              <node id="node-1" label="Первая ачивка">
+              <node id="node-1" AchivementId="11111111-1111-1111-1111-111111111111" label="Первая ачивка">
                 <geometry x="0" y="0"/>
               </node>
             </graph>
@@ -98,7 +72,6 @@ public sealed class AchievementGraphXmlSerializerTests
             [
                 new AchievementGraphNodeState(
                     EarnedAchievementId,
-                    "Первая ачивка",
                     AchievementGraphStatus.Earned)
             ]);
 
@@ -130,11 +103,11 @@ public sealed class AchievementGraphXmlSerializerTests
         var xml = _serializer.Serialize(
             """
             <graph>
-              <node id="node-1" label="Первая">
+              <node id="node-1" achievementId="11111111-1111-1111-1111-111111111111" label="Первая">
                 <geometry x="0" y="0"/>
                 <status state="locked"/>
               </node>
-              <node id="node-2" label="Вторая">
+              <node id="node-2" achievementId="22222222-2222-2222-2222-222222222222" label="Вторая">
                 <geometry x="0" y="0"/>
                 <status state="locked"/>
               </node>
@@ -153,11 +126,9 @@ public sealed class AchievementGraphXmlSerializerTests
             [
                 new AchievementGraphNodeState(
                     EarnedAchievementId,
-                    "Первая",
                     AchievementGraphStatus.Earned),
                 new AchievementGraphNodeState(
                     AvailableAchievementId,
-                    "Вторая",
                     AchievementGraphStatus.Available)
             ]);
 
