@@ -25,3 +25,5 @@ Thumbs.db
 # Local environment files
 .env
 .env.local
+
+graph-3.xml

@@ -1,0 +1,851 @@
+<graph>
+    <canvas width="4096" height="2048"/>
+
+    <!-- Декоративный фон: светлая тема с информатическими значками -->
+    <background>
+        <fill color="#fafbff"/>
+        <pattern id="grid" type="grid" step="200" stroke="#e6ebf5" strokeWidth="1"/>
+        <decor opacity="0.10">
+            <glyph id="g1" text="{}" x="300" y="250" fontSize="220" color="#8b9bb5"/>
+            <glyph id="g2" text="&lt;/&gt;" x="3800" y="280" fontSize="200" color="#8b9bb5"/>
+            <glyph id="g3" text="0101" x="1200" y="180" fontSize="160" color="#8b9bb5"/>
+            <glyph id="g4" text="0110" x="2900" y="220" fontSize="160" color="#8b9bb5"/>
+            <glyph id="g5" text="λx.x" x="700" y="1900" fontSize="180" color="#8b9bb5"/>
+            <glyph id="g6" text="Σ" x="3500" y="1900" fontSize="240" color="#8b9bb5"/>
+            <glyph id="g7" text="∀∃" x="2300" y="1950" fontSize="200" color="#8b9bb5"/>
+            <glyph id="g8" text="→" x="1500" y="250" fontSize="220" color="#8b9bb5"/>
+            <glyph id="g9" text="[]" x="2700" y="1800" fontSize="180" color="#8b9bb5"/>
+            <glyph id="g10" text="()" x="1900" y="1850" fontSize="180" color="#8b9bb5"/>
+            <glyph id="g11" text="⟨T⟩" x="500" y="1000" fontSize="160" color="#8b9bb5"/>
+            <glyph id="g12" text="O(n)" x="3700" y="1050" fontSize="180" color="#8b9bb5"/>
+            <glyph id="g13" text="Δ" x="2500" y="350" fontSize="200" color="#8b9bb5"/>
+            <glyph id="g14" text="π" x="3300" y="1800" fontSize="200" color="#8b9bb5"/>
+            <glyph id="g15" text="&amp;&amp;" x="900" y="450" fontSize="170" color="#8b9bb5"/>
+            <glyph id="g16" text="||" x="3900" y="1700" fontSize="170" color="#8b9bb5"/>
+            <glyph id="g17" text="#" x="2100" y="280" fontSize="200" color="#8b9bb5"/>
+            <glyph id="g18" text="@" x="1300" y="1850" fontSize="180" color="#8b9bb5"/>
+            <glyph id="g19" text="==" x="3100" y="380" fontSize="170" color="#8b9bb5"/>
+            <glyph id="g20" text="≠" x="1700" y="1950" fontSize="180" color="#8b9bb5"/>
+        </decor>
+    </background>
+
+    <!-- ============================================================ -->
+    <!--  УЗЛЫ                                                         -->
+    <!-- ============================================================ -->
+
+    <!-- Прогрессия (центральный путь) -->
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-1" AchivementId="00000000-0000-0000-0000-000000000001" type="circle" label="Подмастерье" rotation="0">
+        <geometry x="3500" y="1970" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#f0f4c3"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-2" AchivementId="00000000-0000-0000-0000-000000000002" type="circle" label="Первый коммит" rotation="0">
+        <geometry x="3500" y="1800" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#f0f4c3"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-3" AchivementId="00000000-0000-0000-0000-000000000003" type="circle" label="Полпути пройдено!" rotation="0">
+        <geometry x="3500" y="1630" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#f0f4c3"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-4" AchivementId="00000000-0000-0000-0000-000000000004" type="circle" label="Лабораторный
+ветеран" rotation="0">
+        <geometry x="3500" y="1460" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#f0f4c3"/>
+        <style alpha="1" border="true"/>
+    </node>
+
+    <!-- Посещаемость лекций -->
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-5" AchivementId="00000000-0000-0000-0000-000000000005" type="circle" label="Первое появление" rotation="0">
+        <geometry x="3700" y="1970" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#f0f4c3"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-6" AchivementId="00000000-0000-0000-0000-000000000006" type="circle" label="Уверенный слушатель" rotation="0">
+        <geometry x="3700" y="1800" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#f0f4c3"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-7" AchivementId="00000000-0000-0000-0000-000000000007" type="circle" label="Образцовый студент" rotation="0">
+        <geometry x="3700" y="1630" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#f0f4c3"/>
+        <style alpha="1" border="true"/>
+    </node>
+
+    <!-- Сем.3 — онбординг -->
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-48" AchivementId="00000000-0000-0000-0000-000000000048" type="circle" label="Азбука теории" rotation="0">
+        <geometry x="900" y="1970" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#f0f4c3"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-49" AchivementId="00000000-0000-0000-0000-000000000049" type="circle" label="Первый опыт" rotation="0">
+        <geometry x="900" y="1800" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#f0f4c3"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-50" AchivementId="00000000-0000-0000-0000-000000000050" type="circle" label="Полпути пройдено!" rotation="0">
+        <geometry x="900" y="1630" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#f0f4c3"/>
+        <style alpha="1" border="true"/>
+    </node>
+
+    <!-- АИСД (массивы/списки/Sequence) -->
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-8" AchivementId="00000000-0000-0000-0000-000000000008" type="circle" label="О, массив!" rotation="0">
+        <geometry x="2500" y="1800" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#e0e0e0"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-9" AchivementId="00000000-0000-0000-0000-000000000009" type="circle" label="Лист, покажись" rotation="0">
+        <geometry x="2500" y="1630" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#e0e0e0"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-10" AchivementId="00000000-0000-0000-0000-000000000010" type="circle" label="Секвенсор" rotation="0">
+        <geometry x="2500" y="1460" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#ce93d8"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-11" AchivementId="00000000-0000-0000-0000-000000000011" type="circle" label="Сегментатор-3000" rotation="0">
+        <geometry x="2500" y="1290" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#ffcc80"/>
+        <style alpha="1" border="true"/>
+    </node>
+
+    <!-- АИСД (структуры на базе Sequence) -->
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-12" AchivementId="00000000-0000-0000-0000-000000000012" type="circle" label="Подвинься!" rotation="0">
+        <geometry x="2300" y="1800" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#e0e0e0"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-13" AchivementId="00000000-0000-0000-0000-000000000013" type="circle" label="Дайте приоритет!" rotation="0">
+        <geometry x="2300" y="1630" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#ce93d8"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-14" AchivementId="00000000-0000-0000-0000-000000000014" type="circle" label="Деконструктор" rotation="0">
+        <geometry x="2300" y="1460" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#90caf9"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-15" AchivementId="00000000-0000-0000-0000-000000000015" type="circle" label="СегменДек" rotation="0">
+        <geometry x="2300" y="1290" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#ce93d8"/>
+        <style alpha="1" border="true"/>
+    </node>
+
+    <!-- Семантика (mutable/immutable, алгебра) -->
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-16" AchivementId="00000000-0000-0000-0000-000000000016" type="circle" label="Чистый разум" rotation="0">
+        <geometry x="2100" y="1800" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#90caf9"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-17" AchivementId="00000000-0000-0000-0000-000000000017" type="circle" label="Двуликий Янус" rotation="0">
+        <geometry x="2100" y="1630" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#ce93d8"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-18" AchivementId="00000000-0000-0000-0000-000000000018" type="circle" label="Алгебраист" rotation="0">
+        <geometry x="2100" y="1460" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#ce93d8"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-19" AchivementId="00000000-0000-0000-0000-000000000019" type="circle" label="Магистр порядка" rotation="0">
+        <geometry x="2100" y="1290" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#ffcc80"/>
+        <style alpha="1" border="true"/>
+    </node>
+
+    <!-- Метатеория (шаблоны, операторы, zip) -->
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-20" AchivementId="00000000-0000-0000-0000-000000000020" type="circle" label="Перегруженный" rotation="0">
+        <geometry x="1900" y="1800" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#e0e0e0"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-21" AchivementId="00000000-0000-0000-0000-000000000021" type="circle" label="Генеральный шаблон" rotation="0">
+        <geometry x="1900" y="1630" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#e0e0e0"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-22" AchivementId="00000000-0000-0000-0000-000000000022" type="circle" label="Сцепщик" rotation="0">
+        <geometry x="1900" y="1460" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#e0e0e0"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-23" AchivementId="00000000-0000-0000-0000-000000000023" type="circle" label="Расщепитель" rotation="0">
+        <geometry x="1900" y="1290" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#e0e0e0"/>
+        <style alpha="1" border="true"/>
+    </node>
+
+    <!-- Метатеория (map-reduce и where) -->
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-24" AchivementId="00000000-0000-0000-0000-000000000024" type="circle" label="Инвертни это!" rotation="0">
+        <geometry x="1700" y="1800" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#90caf9"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-25" AchivementId="00000000-0000-0000-0000-000000000025" type="circle" label="MapReduce: давай заново" rotation="0">
+        <geometry x="1700" y="1630" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#e0e0e0"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-26" AchivementId="00000000-0000-0000-0000-000000000026" type="circle" label="Просеял — победил" rotation="0">
+        <geometry x="1700" y="1460" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#90caf9"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-27" AchivementId="00000000-0000-0000-0000-000000000027" type="circle" label="Фильтруй — не тормози" rotation="0">
+        <geometry x="1700" y="1290" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#e0e0e0"/>
+        <style alpha="1" border="true"/>
+    </node>
+
+    <!-- АИСД (деревья, куча, B-дерево) -->
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-28" AchivementId="00000000-0000-0000-0000-000000000028" type="circle" label="Башня для продвинутых" rotation="0">
+        <geometry x="1500" y="1800" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#ffcc80"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-29" AchivementId="00000000-0000-0000-0000-000000000029" type="circle" label="Кучник" rotation="0">
+        <geometry x="1500" y="1630" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#ce93d8"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-30" AchivementId="00000000-0000-0000-0000-000000000030" type="circle" label="B-древовод" rotation="0">
+        <geometry x="1500" y="1460" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#ce93d8"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-31" AchivementId="00000000-0000-0000-0000-000000000031" type="circle" label="Балансировщик" rotation="0">
+        <geometry x="1500" y="1290" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#90caf9"/>
+        <style alpha="1" border="true"/>
+    </node>
+
+    <!-- АИСД (хеш) и семантика порядка -->
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-32" AchivementId="00000000-0000-0000-0000-000000000032" type="circle" label="Полупорядоченный" rotation="0">
+        <geometry x="1300" y="1800" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#ffcc80"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-33" AchivementId="00000000-0000-0000-0000-000000000033" type="circle" label="Хешер" rotation="0">
+        <geometry x="1300" y="1630" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#90caf9"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-34" AchivementId="00000000-0000-0000-0000-000000000034" type="circle" label="Автоперестройка" rotation="0">
+        <geometry x="1300" y="1460" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#90caf9"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-35" AchivementId="00000000-0000-0000-0000-000000000035" type="circle" label="Древолаз" rotation="0">
+        <geometry x="1300" y="1290" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#90caf9"/>
+        <style alpha="1" border="true"/>
+    </node>
+
+    <!-- АИСД-графы и низкий уровень -->
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-36" AchivementId="00000000-0000-0000-0000-000000000036" type="circle" label="Кусок графика" rotation="0">
+        <geometry x="1100" y="1800" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#90caf9"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-37" AchivementId="00000000-0000-0000-0000-000000000037" type="circle" label="Путеискатель" rotation="0">
+        <geometry x="1100" y="1630" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#ce93d8"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-38" AchivementId="00000000-0000-0000-0000-000000000038" type="circle" label="Граф-теоретик" rotation="0">
+        <geometry x="1100" y="1460" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#ffcc80"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-39" AchivementId="00000000-0000-0000-0000-000000000039" type="circle" label="Без утечек" rotation="0">
+        <geometry x="1100" y="1290" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#90caf9"/>
+        <style alpha="1" border="true"/>
+    </node>
+
+    <!-- Вершины треков (финалы по колонкам) -->
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-40" AchivementId="00000000-0000-0000-0000-000000000040" type="circle" label="Аналитик функций" rotation="0">
+        <geometry x="1100" y="1120" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#90caf9"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-41" AchivementId="00000000-0000-0000-0000-000000000041" type="circle" label="Логик порядка" rotation="0">
+        <geometry x="1300" y="1120" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#ffcc80"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-42" AchivementId="00000000-0000-0000-0000-000000000042" type="circle" label="Властелин рекурсии" rotation="0">
+        <geometry x="1500" y="1120" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#e0e0e0"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-43" AchivementId="00000000-0000-0000-0000-000000000043" type="circle" label="Повелитель линейных структур" rotation="0">
+        <geometry x="1700" y="1120" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#90caf9"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-44" AchivementId="00000000-0000-0000-0000-000000000044" type="circle" label="Хранитель памяти" rotation="0">
+        <geometry x="1900" y="1120" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#e0e0e0"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-45" AchivementId="00000000-0000-0000-0000-000000000045" type="circle" label="Инженер многомерных структур" rotation="0">
+        <geometry x="2100" y="1120" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#90caf9"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-46" AchivementId="00000000-0000-0000-0000-000000000046" type="circle" label="Очередник" rotation="0">
+        <geometry x="2300" y="1120" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#ce93d8"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-47" AchivementId="00000000-0000-0000-0000-000000000047" type="circle" label="Мастер базы" rotation="0">
+        <geometry x="2500" y="1120" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#ce93d8"/>
+        <style alpha="1" border="true"/>
+    </node>
+
+    <!-- Финальные звания -->
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-52" AchivementId="00000000-0000-0000-0000-000000000052" type="circle" label="Итоги" rotation="0">
+        <geometry x="3500" y="700" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#ffffff"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-53" AchivementId="00000000-0000-0000-0000-000000000053" type="circle" label="Мастер курса" rotation="0">
+        <geometry x="3500" y="530" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#ffffff"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-54" AchivementId="00000000-0000-0000-0000-000000000054" type="circle" label="Ас курса" rotation="0">
+        <geometry x="3700" y="530" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#ffffff"/>
+        <style alpha="1" border="true"/>
+    </node>
+    <node dialect="base" id="kqRZZZaIueUMFGOhbLgu-55" AchivementId="00000000-0000-0000-0000-000000000055" type="circle" label="Главный лентяй курса" rotation="0">
+        <geometry x="3300" y="530" radius="50" border="true"/>
+        <status state="locked"/>
+        <background color="#ffffff"/>
+        <style alpha="1" border="true"/>
+    </node>
+
+    <!-- ============================================================ -->
+    <!--  РЁБРА                                                        -->
+    <!-- ============================================================ -->
+
+    <!-- из: Прогрессия (центральный путь) -->
+    <edge dialect="base" id="BjKPCylyBFRQYZN12" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-1" target="kqRZZZaIueUMFGOhbLgu-2" endArrow=">" startArrow="none">
+        <lineGeometry startX="3500" startY="1920" endX="3500" endY="1850"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY1-5" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-1" target="kqRZZZaIueUMFGOhbLgu-5" endArrow=">" startArrow="none">
+        <lineGeometry startX="3550" startY="1970" endX="3650" endY="1970"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY1-48" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-1" target="kqRZZZaIueUMFGOhbLgu-48" endArrow=">" startArrow="none">
+        <lineGeometry startX="3450" startY="1970" endX="950" endY="1970"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY1-8" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-1" target="kqRZZZaIueUMFGOhbLgu-8" endArrow=">" startArrow="none">
+        <lineGeometry startX="3500" startY="1920" endX="2500" endY="1850"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+        <internalPoints>
+            <internalPoint x="2500" y="1920"/>
+        </internalPoints>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY1-12" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-1" target="kqRZZZaIueUMFGOhbLgu-12" endArrow=">" startArrow="none">
+        <lineGeometry startX="3500" startY="1920" endX="2300" endY="1850"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+        <internalPoints>
+            <internalPoint x="2300" y="1920"/>
+        </internalPoints>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY1-16" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-1" target="kqRZZZaIueUMFGOhbLgu-16" endArrow=">" startArrow="none">
+        <lineGeometry startX="3500" startY="1920" endX="2100" endY="1850"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+        <internalPoints>
+            <internalPoint x="2100" y="1920"/>
+        </internalPoints>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY1-20" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-1" target="kqRZZZaIueUMFGOhbLgu-20" endArrow=">" startArrow="none">
+        <lineGeometry startX="3500" startY="1920" endX="1900" endY="1850"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+        <internalPoints>
+            <internalPoint x="1900" y="1920"/>
+        </internalPoints>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY1-24" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-1" target="kqRZZZaIueUMFGOhbLgu-24" endArrow=">" startArrow="none">
+        <lineGeometry startX="3500" startY="1920" endX="1700" endY="1850"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+        <internalPoints>
+            <internalPoint x="1700" y="1920"/>
+        </internalPoints>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY1-28" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-1" target="kqRZZZaIueUMFGOhbLgu-28" endArrow=">" startArrow="none">
+        <lineGeometry startX="3500" startY="1920" endX="1500" endY="1850"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+        <internalPoints>
+            <internalPoint x="1500" y="1920"/>
+        </internalPoints>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY1-32" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-1" target="kqRZZZaIueUMFGOhbLgu-32" endArrow=">" startArrow="none">
+        <lineGeometry startX="3500" startY="1920" endX="1300" endY="1850"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+        <internalPoints>
+            <internalPoint x="1300" y="1920"/>
+        </internalPoints>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY1-36" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-1" target="kqRZZZaIueUMFGOhbLgu-36" endArrow=">" startArrow="none">
+        <lineGeometry startX="3500" startY="1920" endX="1100" endY="1850"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+        <internalPoints>
+            <internalPoint x="1100" y="1920"/>
+        </internalPoints>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY2-3" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-3" target="kqRZZZaIueUMFGOhbLgu-4" endArrow=">" startArrow="none">
+        <lineGeometry startX="3500" startY="1580" endX="3500" endY="1510"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY4-52" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-4" target="kqRZZZaIueUMFGOhbLgu-52" endArrow=">" startArrow="none">
+        <lineGeometry startX="3500" startY="1410" endX="3500" endY="750"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+
+    <!-- из: Посещаемость лекций -->
+    <edge dialect="base" id="BjKPCylyBFRQYZNY5-6" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-5" target="kqRZZZaIueUMFGOhbLgu-6" endArrow=">" startArrow="none">
+        <lineGeometry startX="3700" startY="1920" endX="3700" endY="1850"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY6-7" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-6" target="kqRZZZaIueUMFGOhbLgu-7" endArrow=">" startArrow="none">
+        <lineGeometry startX="3700" startY="1750" endX="3700" endY="1680"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY7-52" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-7" target="kqRZZZaIueUMFGOhbLgu-52" endArrow=">" startArrow="none">
+        <lineGeometry startX="3700" startY="1580" endX="3550" endY="700"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+        <internalPoints>
+            <internalPoint x="3700" y="700"/>
+        </internalPoints>
+    </edge>
+
+    <!-- из: Сем.3 — онбординг -->
+    <edge dialect="base" id="BjKPCylyBFRQYZNY48-49" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-48" target="kqRZZZaIueUMFGOhbLgu-49" endArrow=">" startArrow="none">
+        <lineGeometry startX="900" startY="1920" endX="900" endY="1850"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY49-50" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-49" target="kqRZZZaIueUMFGOhbLgu-50" endArrow=">" startArrow="none">
+        <lineGeometry startX="900" startY="1750" endX="900" endY="1680"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY50-52" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-50" target="kqRZZZaIueUMFGOhbLgu-52" endArrow=">" startArrow="none">
+        <lineGeometry startX="900" startY="1580" endX="3450" endY="700"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+        <internalPoints>
+            <internalPoint x="900" y="700"/>
+        </internalPoints>
+    </edge>
+
+    <!-- из: АИСД (массивы/списки/Sequence) -->
+    <edge dialect="base" id="BjKPCylyBFRQYZNY8-9" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-8" target="kqRZZZaIueUMFGOhbLgu-9" endArrow=">" startArrow="none">
+        <lineGeometry startX="2500" startY="1750" endX="2500" endY="1680"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY9-10" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-9" target="kqRZZZaIueUMFGOhbLgu-10" endArrow=">" startArrow="none">
+        <lineGeometry startX="2500" startY="1580" endX="2500" endY="1510"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY10-11" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-10" target="kqRZZZaIueUMFGOhbLgu-11" endArrow=">" startArrow="none">
+        <lineGeometry startX="2500" startY="1410" endX="2500" endY="1340"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY11-47" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-11" target="kqRZZZaIueUMFGOhbLgu-47" endArrow=">" startArrow="none">
+        <lineGeometry startX="2500" startY="1240" endX="2500" endY="1170"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+
+    <!-- из: АИСД (структуры на базе Sequence) -->
+    <edge dialect="base" id="BjKPCylyBFRQYZNY12-13" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-12" target="kqRZZZaIueUMFGOhbLgu-13" endArrow=">" startArrow="none">
+        <lineGeometry startX="2300" startY="1750" endX="2300" endY="1680"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY13-14" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-13" target="kqRZZZaIueUMFGOhbLgu-14" endArrow=">" startArrow="none">
+        <lineGeometry startX="2300" startY="1580" endX="2300" endY="1510"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY14-15" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-14" target="kqRZZZaIueUMFGOhbLgu-15" endArrow=">" startArrow="none">
+        <lineGeometry startX="2300" startY="1410" endX="2300" endY="1340"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY15-46" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-15" target="kqRZZZaIueUMFGOhbLgu-46" endArrow=">" startArrow="none">
+        <lineGeometry startX="2300" startY="1240" endX="2300" endY="1170"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+
+    <!-- из: Семантика (mutable/immutable, алгебра) -->
+    <edge dialect="base" id="BjKPCylyBFRQYZNY16-17" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-16" target="kqRZZZaIueUMFGOhbLgu-17" endArrow=">" startArrow="none">
+        <lineGeometry startX="2100" startY="1750" endX="2100" endY="1680"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY17-18" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-17" target="kqRZZZaIueUMFGOhbLgu-18" endArrow=">" startArrow="none">
+        <lineGeometry startX="2100" startY="1580" endX="2100" endY="1510"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY18-19" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-18" target="kqRZZZaIueUMFGOhbLgu-19" endArrow=">" startArrow="none">
+        <lineGeometry startX="2100" startY="1410" endX="2100" endY="1340"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY19-45" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-19" target="kqRZZZaIueUMFGOhbLgu-45" endArrow=">" startArrow="none">
+        <lineGeometry startX="2100" startY="1240" endX="2100" endY="1170"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+
+    <!-- из: Метатеория (шаблоны, операторы, zip) -->
+    <edge dialect="base" id="BjKPCylyBFRQYZNY20-21" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-20" target="kqRZZZaIueUMFGOhbLgu-21" endArrow=">" startArrow="none">
+        <lineGeometry startX="1900" startY="1750" endX="1900" endY="1680"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY21-22" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-21" target="kqRZZZaIueUMFGOhbLgu-22" endArrow=">" startArrow="none">
+        <lineGeometry startX="1900" startY="1580" endX="1900" endY="1510"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY22-23" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-22" target="kqRZZZaIueUMFGOhbLgu-23" endArrow=">" startArrow="none">
+        <lineGeometry startX="1900" startY="1410" endX="1900" endY="1340"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY23-44" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-23" target="kqRZZZaIueUMFGOhbLgu-44" endArrow=">" startArrow="none">
+        <lineGeometry startX="1900" startY="1240" endX="1900" endY="1170"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+
+    <!-- из: Метатеория (map-reduce и where) -->
+    <edge dialect="base" id="BjKPCylyBFRQYZNY24-25" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-24" target="kqRZZZaIueUMFGOhbLgu-25" endArrow=">" startArrow="none">
+        <lineGeometry startX="1700" startY="1750" endX="1700" endY="1680"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY25-26" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-25" target="kqRZZZaIueUMFGOhbLgu-26" endArrow=">" startArrow="none">
+        <lineGeometry startX="1700" startY="1580" endX="1700" endY="1510"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY26-27" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-26" target="kqRZZZaIueUMFGOhbLgu-27" endArrow=">" startArrow="none">
+        <lineGeometry startX="1700" startY="1410" endX="1700" endY="1340"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY27-43" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-27" target="kqRZZZaIueUMFGOhbLgu-43" endArrow=">" startArrow="none">
+        <lineGeometry startX="1700" startY="1240" endX="1700" endY="1170"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+
+    <!-- из: АИСД (деревья, куча, B-дерево) -->
+    <edge dialect="base" id="BjKPCylyBFRQYZNY28-29" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-28" target="kqRZZZaIueUMFGOhbLgu-29" endArrow=">" startArrow="none">
+        <lineGeometry startX="1500" startY="1750" endX="1500" endY="1680"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY29-30" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-29" target="kqRZZZaIueUMFGOhbLgu-30" endArrow=">" startArrow="none">
+        <lineGeometry startX="1500" startY="1580" endX="1500" endY="1510"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY30-31" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-30" target="kqRZZZaIueUMFGOhbLgu-31" endArrow=">" startArrow="none">
+        <lineGeometry startX="1500" startY="1410" endX="1500" endY="1340"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY31-42" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-31" target="kqRZZZaIueUMFGOhbLgu-42" endArrow=">" startArrow="none">
+        <lineGeometry startX="1500" startY="1240" endX="1500" endY="1170"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+
+    <!-- из: АИСД (хеш) и семантика порядка -->
+    <edge dialect="base" id="BjKPCylyBFRQYZNY32-33" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-32" target="kqRZZZaIueUMFGOhbLgu-33" endArrow=">" startArrow="none">
+        <lineGeometry startX="1300" startY="1750" endX="1300" endY="1680"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY33-34" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-33" target="kqRZZZaIueUMFGOhbLgu-34" endArrow=">" startArrow="none">
+        <lineGeometry startX="1300" startY="1580" endX="1300" endY="1510"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY34-35" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-34" target="kqRZZZaIueUMFGOhbLgu-35" endArrow=">" startArrow="none">
+        <lineGeometry startX="1300" startY="1410" endX="1300" endY="1340"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY35-41" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-35" target="kqRZZZaIueUMFGOhbLgu-41" endArrow=">" startArrow="none">
+        <lineGeometry startX="1300" startY="1240" endX="1300" endY="1170"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+
+    <!-- из: АИСД-графы и низкий уровень -->
+    <edge dialect="base" id="BjKPCylyBFRQYZNY36-37" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-36" target="kqRZZZaIueUMFGOhbLgu-37" endArrow=">" startArrow="none">
+        <lineGeometry startX="1100" startY="1750" endX="1100" endY="1680"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY37-38" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-37" target="kqRZZZaIueUMFGOhbLgu-38" endArrow=">" startArrow="none">
+        <lineGeometry startX="1100" startY="1580" endX="1100" endY="1510"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY38-39" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-38" target="kqRZZZaIueUMFGOhbLgu-39" endArrow=">" startArrow="none">
+        <lineGeometry startX="1100" startY="1410" endX="1100" endY="1340"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY39-40" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-39" target="kqRZZZaIueUMFGOhbLgu-40" endArrow=">" startArrow="none">
+        <lineGeometry startX="1100" startY="1240" endX="1100" endY="1170"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+
+    <!-- из: Вершины треков (финалы по колонкам) -->
+    <edge dialect="base" id="BjKPCylyBFRQYZNY40-52" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-40" target="kqRZZZaIueUMFGOhbLgu-52" endArrow=">" startArrow="none">
+        <lineGeometry startX="1100" startY="1070" endX="3450" endY="700"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+        <internalPoints>
+            <internalPoint x="1100" y="700"/>
+        </internalPoints>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY41-52" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-41" target="kqRZZZaIueUMFGOhbLgu-52" endArrow=">" startArrow="none">
+        <lineGeometry startX="1300" startY="1070" endX="3450" endY="700"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+        <internalPoints>
+            <internalPoint x="1300" y="700"/>
+        </internalPoints>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY42-52" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-42" target="kqRZZZaIueUMFGOhbLgu-52" endArrow=">" startArrow="none">
+        <lineGeometry startX="1500" startY="1070" endX="3450" endY="700"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+        <internalPoints>
+            <internalPoint x="1500" y="700"/>
+        </internalPoints>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY43-52" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-43" target="kqRZZZaIueUMFGOhbLgu-52" endArrow=">" startArrow="none">
+        <lineGeometry startX="1700" startY="1070" endX="3450" endY="700"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+        <internalPoints>
+            <internalPoint x="1700" y="700"/>
+        </internalPoints>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY44-52" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-44" target="kqRZZZaIueUMFGOhbLgu-52" endArrow=">" startArrow="none">
+        <lineGeometry startX="1900" startY="1070" endX="3450" endY="700"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+        <internalPoints>
+            <internalPoint x="1900" y="700"/>
+        </internalPoints>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY45-52" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-45" target="kqRZZZaIueUMFGOhbLgu-52" endArrow=">" startArrow="none">
+        <lineGeometry startX="2100" startY="1070" endX="3450" endY="700"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+        <internalPoints>
+            <internalPoint x="2100" y="700"/>
+        </internalPoints>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY46-52" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-46" target="kqRZZZaIueUMFGOhbLgu-52" endArrow=">" startArrow="none">
+        <lineGeometry startX="2300" startY="1070" endX="3450" endY="700"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+        <internalPoints>
+            <internalPoint x="2300" y="700"/>
+        </internalPoints>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY47-52" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-47" target="kqRZZZaIueUMFGOhbLgu-52" endArrow=">" startArrow="none">
+        <lineGeometry startX="2500" startY="1070" endX="3450" endY="700"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+        <internalPoints>
+            <internalPoint x="2500" y="700"/>
+        </internalPoints>
+    </edge>
+
+    <!-- из: Финальные звания -->
+    <edge dialect="base" id="BjKPCylyBFRQYZNY52-53" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-52" target="kqRZZZaIueUMFGOhbLgu-53" endArrow=">" startArrow="none">
+        <lineGeometry startX="3500" startY="650" endX="3500" endY="580"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY52-54" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-52" target="kqRZZZaIueUMFGOhbLgu-54" endArrow=">" startArrow="none">
+        <lineGeometry startX="3500" startY="650" endX="3300" endY="580"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+    <edge dialect="base" id="BjKPCylyBFRQYZNY52-55" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-52" target="kqRZZZaIueUMFGOhbLgu-55" endArrow=">" startArrow="none">
+        <lineGeometry startX="3500" startY="650" endX="3700" endY="580"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+
+    <!-- из: Прочее -->
+    <edge dialect="base" id="BjKPCylyBFRQYZNY1-2" type="line" label="" source="kqRZZZaIueUMFGOhbLgu-2" target="kqRZZZaIueUMFGOhbLgu-3" endArrow=">" startArrow="none">
+        <lineGeometry startX="3500" startY="1750" endX="3500" endY="1680"/>
+        <status state="locked"/>
+        <background color="#5b6478"/>
+        <edgeStyle lineWidth="2" isRounded="true" isEdgeDash="false" maxRadiusOfCorners="10"/>
+    </edge>
+
+</graph>
