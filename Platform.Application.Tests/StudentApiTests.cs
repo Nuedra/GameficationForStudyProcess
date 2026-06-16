@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Xml.Linq;
 using Platform.Application.Contracts;
 
 namespace Platform.Application.Tests;
@@ -104,6 +105,41 @@ public sealed class StudentApiTests(StudentApiFactory factory)
         Assert.Equal("course_access_denied", error!.Code);
     }
 
+    [Fact]
+    public async Task AchievementGraph_OwnCourse_ReturnsXmlWithResolvedStatuses()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.StudentId);
+
+        var response = await client.GetAsync(
+            $"/api/student/courses/{StudentApiFactory.CourseId}/2026/achievements/graph");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/xml", response.Content.Headers.ContentType!.MediaType);
+
+        var xml = await response.Content.ReadAsStringAsync();
+        var document = XDocument.Parse(xml);
+
+        Assert.Equal("earned", GetNodeStatus(document, "earned"));
+        Assert.Equal("available", GetNodeStatus(document, "available"));
+        Assert.Equal("locked", GetNodeStatus(document, "not-from-db"));
+        Assert.Equal("available", GetEdgeStatus(document, "edge-earned-available"));
+    }
+
+    [Fact]
+    public async Task AchievementGraph_ForeignCourse_ReturnsForbidden()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.StudentId);
+
+        var response = await client.GetAsync(
+            $"/api/student/courses/{StudentApiFactory.OtherCourseId}/2026/achievements/graph");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ApiErrorDto>(JsonOptions);
+        Assert.Equal("course_access_denied", error!.Code);
+    }
+
     private HttpClient CreateClient()
     {
         return factory.CreateClient(new()
@@ -127,5 +163,27 @@ public sealed class StudentApiTests(StudentApiFactory factory)
         var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
         options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
         return options;
+    }
+
+    private static string GetNodeStatus(XDocument document, string nodeId)
+    {
+        return document
+            .Root!
+            .Elements("node")
+            .Single(node => node.Attribute("id")?.Value == nodeId)
+            .Element("status")!
+            .Attribute("state")!
+            .Value;
+    }
+
+    private static string GetEdgeStatus(XDocument document, string edgeId)
+    {
+        return document
+            .Root!
+            .Elements("edge")
+            .Single(edge => edge.Attribute("id")?.Value == edgeId)
+            .Element("status")!
+            .Attribute("state")!
+            .Value;
     }
 }

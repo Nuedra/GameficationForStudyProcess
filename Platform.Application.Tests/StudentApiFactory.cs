@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Platform.Application.Services;
 using Platform.DataAccess.Postgress;
 
 namespace Platform.Application.Tests;
@@ -31,8 +32,11 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
         {
             services.RemoveAll<DbContextOptions<PlatformDbContext>>();
             services.RemoveAll<PlatformDbContext>();
+            services.RemoveAll<IAchievementGraphTemplateProvider>();
             services.AddDbContext<PlatformDbContext>(options =>
                 options.UseInMemoryDatabase(_databaseName));
+            services.AddSingleton<IAchievementGraphTemplateProvider>(
+                new TestAchievementGraphTemplateProvider());
 
             using var serviceProvider = services.BuildServiceProvider();
             using var scope = serviceProvider.CreateScope();
@@ -148,8 +152,43 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
                     new DateTime(2026, 3, 1, 10, 0, 0, DateTimeKind.Utc),
                 AchievementFoundDate =
                     new DateTime(2026, 3, 1, 10, 5, 0, DateTimeKind.Utc)
+            },
+            new AchievementConnectionEntity
+            {
+                Id = Guid.NewGuid(),
+                SourceId = EarnedAchievementId,
+                Source = earnedAchievement,
+                TargetId = LockedAchievementId,
+                Target = lockedAchievement
             });
 
         dbContext.SaveChanges();
+    }
+
+    private sealed class TestAchievementGraphTemplateProvider : IAchievementGraphTemplateProvider
+    {
+        public Task<string> GetTemplateAsync(CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(
+                """
+                <graph>
+                  <node id="earned" AchivementId="55555555-5555-5555-5555-555555555555" label="Первая ачивка">
+                    <geometry x="0" y="0"/>
+                    <status state="locked"/>
+                  </node>
+                  <node id="available" AchivementId="66666666-6666-6666-6666-666666666666" label="Следующая ачивка">
+                    <geometry x="1" y="0"/>
+                    <status state="locked"/>
+                  </node>
+                  <node id="not-from-db" AchivementId="77777777-7777-7777-7777-777777777777" label="Нет в БД">
+                    <geometry x="2" y="0"/>
+                    <status state="earned"/>
+                  </node>
+                  <edge id="edge-earned-available" source="earned" target="available">
+                    <status state="locked"/>
+                  </edge>
+                </graph>
+                """);
+        }
     }
 }
