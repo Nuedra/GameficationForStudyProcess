@@ -1,3 +1,4 @@
 {
-    "dotnet.defaultSolution": "Platform.sln"
+    "dotnet.defaultSolution": "Platform.sln",
+    "typescript.tsdk": "Graph.Component/node_modules/typescript/lib"
 }
