@@ -23,7 +23,7 @@ public sealed class StudentAchievementGraphService(
             year,
             cancellationToken);
 
-        if (accessStatus != StudentAchievementsQueryStatus.Success)
+        if (accessStatus != StudentAchievementGraphAccessStatus.Success)
             return ToGraphResult(accessStatus);
 
         var nodeStates = await GetNodeStatesAsync(
@@ -58,7 +58,7 @@ public sealed class StudentAchievementGraphService(
         }
     }
 
-    private async Task<StudentAchievementsQueryStatus> CheckAccessAsync(
+    private async Task<StudentAchievementGraphAccessStatus> CheckAccessAsync(
         Guid studentId,
         Guid courseId,
         int year,
@@ -69,7 +69,7 @@ public sealed class StudentAchievementGraphService(
             .AnyAsync(student => student.Id == studentId, cancellationToken);
 
         if (!studentExists)
-            return StudentAchievementsQueryStatus.StudentNotFound;
+            return StudentAchievementGraphAccessStatus.StudentNotFound;
 
         var courseExists = await dbContext.CourseInstances
             .AsNoTracking()
@@ -78,7 +78,7 @@ public sealed class StudentAchievementGraphService(
                 cancellationToken);
 
         if (!courseExists)
-            return StudentAchievementsQueryStatus.CourseNotFound;
+            return StudentAchievementGraphAccessStatus.CourseNotFound;
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
         var hasCourseAccess = await dbContext.CourseInstanceStudents
@@ -93,8 +93,8 @@ public sealed class StudentAchievementGraphService(
                 cancellationToken);
 
         return hasCourseAccess
-            ? StudentAchievementsQueryStatus.Success
-            : StudentAchievementsQueryStatus.AccessDenied;
+            ? StudentAchievementGraphAccessStatus.Success
+            : StudentAchievementGraphAccessStatus.AccessDenied;
     }
 
     private async Task<IReadOnlyList<AchievementGraphNodeState>> GetNodeStatesAsync(
@@ -164,21 +164,29 @@ public sealed class StudentAchievementGraphService(
     }
 
     private static StudentAchievementGraphQueryResult ToGraphResult(
-        StudentAchievementsQueryStatus status)
+        StudentAchievementGraphAccessStatus status)
     {
         return status switch
         {
-            StudentAchievementsQueryStatus.StudentNotFound =>
+            StudentAchievementGraphAccessStatus.StudentNotFound =>
                 new StudentAchievementGraphQueryResult(
                     StudentAchievementGraphQueryStatus.StudentNotFound),
-            StudentAchievementsQueryStatus.CourseNotFound =>
+            StudentAchievementGraphAccessStatus.CourseNotFound =>
                 new StudentAchievementGraphQueryResult(
                     StudentAchievementGraphQueryStatus.CourseNotFound),
-            StudentAchievementsQueryStatus.AccessDenied =>
+            StudentAchievementGraphAccessStatus.AccessDenied =>
                 new StudentAchievementGraphQueryResult(
                     StudentAchievementGraphQueryStatus.AccessDenied),
             _ => new StudentAchievementGraphQueryResult(
                 StudentAchievementGraphQueryStatus.InvalidTemplate)
         };
+    }
+
+    private enum StudentAchievementGraphAccessStatus
+    {
+        Success,
+        StudentNotFound,
+        CourseNotFound,
+        AccessDenied
     }
 }

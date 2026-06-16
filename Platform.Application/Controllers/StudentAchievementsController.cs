@@ -11,54 +11,8 @@ namespace Platform.Application.Controllers;
 [Authorize(Roles = "student")]
 [Route("api/student/courses/{courseId:guid}/{year:int}/achievements")]
 public sealed class StudentAchievementsController(
-    IStudentAchievementService studentAchievementService,
     IStudentAchievementGraphService studentAchievementGraphService) : ControllerBase
 {
-    /// <summary>
-    /// Возвращает полученные достижения студента по выбранному курсу.
-    /// </summary>
-    /// <remarks>
-    /// Сейчас endpoint отдаёт только уже полученные достижения. Доступные и заблокированные
-    /// достижения вычисляются отдельно для XML-графа.
-    /// </remarks>
-    /// <param name="courseId">ID курса.</param>
-    /// <param name="year">Год экземпляра курса.</param>
-    /// <param name="cancellationToken">Токен отмены запроса.</param>
-    /// <returns>Студент, курс и список полученных достижений.</returns>
-    [HttpGet]
-    [Produces("application/json")]
-    [ProducesResponseType(typeof(StudentAchievementsDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiErrorDto), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ApiErrorDto), StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(typeof(ApiErrorDto), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<StudentAchievementsDto>> GetAchievements(
-        Guid courseId,
-        int year,
-        CancellationToken cancellationToken)
-    {
-        if (!User.TryGetUserId(out var studentId))
-            return Unauthorized(ApiErrors.AuthenticationRequired);
-
-        var result = await studentAchievementService.GetEarnedAchievementsAsync(
-            studentId,
-            courseId,
-            year,
-            cancellationToken);
-
-        return result.Status switch
-        {
-            StudentAchievementsQueryStatus.Success => Ok(result.Data),
-            StudentAchievementsQueryStatus.StudentNotFound =>
-                Unauthorized(ApiErrors.AuthenticationRequired),
-            StudentAchievementsQueryStatus.CourseNotFound =>
-                NotFound(ApiErrors.CourseNotFound),
-            StudentAchievementsQueryStatus.AccessDenied =>
-                StatusCode(StatusCodes.Status403Forbidden, ApiErrors.CourseAccessDenied),
-            _ => StatusCode(StatusCodes.Status500InternalServerError)
-        };
-    }
-
     /// <summary>
     /// Возвращает XML-граф достижений студента по выбранному курсу.
     /// </summary>

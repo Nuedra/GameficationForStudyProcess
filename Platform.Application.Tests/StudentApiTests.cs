@@ -69,43 +69,6 @@ public sealed class StudentApiTests(StudentApiFactory factory)
     }
 
     [Fact]
-    public async Task Achievements_OwnCourse_ReturnsOnlyEarnedAchievements()
-    {
-        using var client = CreateClient();
-        await Login(client, StudentApiFactory.StudentId);
-
-        var response = await client.GetAsync(
-            $"/api/student/courses/{StudentApiFactory.CourseId}/2026/achievements");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var result = await response.Content.ReadFromJsonAsync<StudentAchievementsDto>(
-            JsonOptions);
-        var achievement = Assert.Single(result!.Achievements);
-        Assert.Equal(StudentApiFactory.EarnedAchievementId, achievement.Id);
-        Assert.Equal(AchievementStatus.Earned, achievement.Status);
-        Assert.DoesNotContain(
-            result.Achievements,
-            item => item.Id == StudentApiFactory.LockedAchievementId);
-
-        var json = await response.Content.ReadAsStringAsync();
-        Assert.Contains("\"status\":\"earned\"", json, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task Achievements_ForeignCourse_ReturnsForbidden()
-    {
-        using var client = CreateClient();
-        await Login(client, StudentApiFactory.StudentId);
-
-        var response = await client.GetAsync(
-            $"/api/student/courses/{StudentApiFactory.OtherCourseId}/2026/achievements");
-
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-        var error = await response.Content.ReadFromJsonAsync<ApiErrorDto>(JsonOptions);
-        Assert.Equal("course_access_denied", error!.Code);
-    }
-
-    [Fact]
     public async Task AchievementGraph_OwnCourse_ReturnsXmlWithResolvedStatuses()
     {
         using var client = CreateClient();

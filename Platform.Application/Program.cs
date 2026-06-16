@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Platform.Application.Contracts;
 using Platform.Application.Services;
+using Platform.Application.Swagger;
 using Platform.Core.AchievementGraphs;
 using Platform.Core.Appraisals;
 using Platform.Core.Processing;
@@ -36,6 +37,8 @@ builder.Services.AddSwaggerGen(options =>
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     if (File.Exists(xmlPath))
         options.IncludeXmlComments(xmlPath);
+
+    options.OperationFilter<AchievementGraphXmlExampleFilter>();
 });
 builder.Services
     .AddControllers()
@@ -75,7 +78,6 @@ builder.Services.AddDbContext<PlatformDbContext>(options =>
 builder.Services.AddScoped<IUserContextService, UserContextService>();
 builder.Services.AddScoped<IStudentIdentityService, StudentIdentityService>();
 builder.Services.AddScoped<IStudentCourseService, StudentCourseService>();
-builder.Services.AddScoped<IStudentAchievementService, StudentAchievementService>();
 builder.Services.AddScoped<IStudentAchievementGraphService, StudentAchievementGraphService>();
 builder.Services.AddSingleton<IAchievementGraphTemplateProvider, FileAchievementGraphTemplateProvider>();
 builder.Services.AddSingleton<IAchievementGraphXmlSerializer, AchievementGraphXmlSerializer>();
