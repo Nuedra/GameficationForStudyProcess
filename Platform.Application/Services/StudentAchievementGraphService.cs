@@ -9,7 +9,8 @@ public sealed class StudentAchievementGraphService(
     PlatformDbContext dbContext,
     TimeProvider timeProvider,
     IAchievementGraphTemplateProvider templateProvider,
-    IAchievementGraphXmlSerializer serializer) : IStudentAchievementGraphService
+    IAchievementGraphXmlSerializer serializer,
+    AchievementProcessingCycle achievementProcessingCycle) : IStudentAchievementGraphService
 {
     public async Task<StudentAchievementGraphQueryResult> GetGraphXmlAsync(
         Guid studentId,
@@ -56,6 +57,30 @@ public sealed class StudentAchievementGraphService(
             return new StudentAchievementGraphQueryResult(
                 StudentAchievementGraphQueryStatus.InvalidTemplate);
         }
+    }
+
+    public async Task<StudentAchievementGraphQueryResult> RefreshGraphXmlAsync(
+        Guid studentId,
+        Guid courseId,
+        int year,
+        CancellationToken cancellationToken = default)
+    {
+        var accessStatus = await CheckAccessAsync(
+            studentId,
+            courseId,
+            year,
+            cancellationToken);
+
+        if (accessStatus != StudentAchievementGraphAccessStatus.Success)
+            return ToGraphResult(accessStatus);
+
+        await achievementProcessingCycle.RunAsync(studentId, cancellationToken);
+
+        return await GetGraphXmlAsync(
+            studentId,
+            courseId,
+            year,
+            cancellationToken);
     }
 
     private async Task<StudentAchievementGraphAccessStatus> CheckAccessAsync(

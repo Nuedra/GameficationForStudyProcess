@@ -7,6 +7,7 @@ namespace Platform.Application.Swagger;
 public sealed class AchievementGraphXmlExampleFilter : IOperationFilter
 {
     private const string AchievementGraphPathSuffix = "achievements/graph";
+    private const string AchievementGraphRefreshPathSuffix = "achievements/graph/refresh";
 
     private const string ExampleXml =
         """
@@ -32,9 +33,7 @@ public sealed class AchievementGraphXmlExampleFilter : IOperationFilter
     public void Apply(OpenApiOperation operation, OperationFilterContext context)
     {
         if (context.ApiDescription.RelativePath is null ||
-            !context.ApiDescription.RelativePath.EndsWith(
-                AchievementGraphPathSuffix,
-                StringComparison.OrdinalIgnoreCase))
+            !IsAchievementGraphPath(context.ApiDescription.RelativePath))
         {
             return;
         }
@@ -51,5 +50,15 @@ public sealed class AchievementGraphXmlExampleFilter : IOperationFilter
             Description = "XML-граф достижений со статусами earned, available и locked."
         };
         content.Example = new OpenApiString(ExampleXml);
+    }
+
+    private static bool IsAchievementGraphPath(string relativePath)
+    {
+        return relativePath.EndsWith(
+                   AchievementGraphPathSuffix,
+                   StringComparison.OrdinalIgnoreCase) ||
+               relativePath.EndsWith(
+                   AchievementGraphRefreshPathSuffix,
+                   StringComparison.OrdinalIgnoreCase);
     }
 }
