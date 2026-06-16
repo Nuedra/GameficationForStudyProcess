@@ -4,6 +4,7 @@
   "private": true,
   "main": "src/index.ts",
   "scripts": {
+    "dev": "vite --host 127.0.0.1",
     "build": "vue-cli-service build --target lib src/index.ts --name AchievementGraphComponent",
     "test": "vitest run",
     "test:watch": "vitest"

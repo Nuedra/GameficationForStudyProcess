@@ -4982,6 +4982,7 @@ export class Label {
 
         const dx = this._endX - this._startX
         const dy = this._endY - this._startY
+        const length = Math.sqrt(dx * dx + dy * dy) || 1
 
         let pointX, pointY, pad
 

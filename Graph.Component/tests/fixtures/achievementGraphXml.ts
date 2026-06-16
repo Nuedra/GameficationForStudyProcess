@@ -4,12 +4,12 @@ export const achievementGraphXml = `<?xml version="1.0" encoding="UTF-8"?>
   <background>
     <fill color="#f0f4ff" />
   </background>
-  <node id="earned-node" type="circle" label="" rotation="0">
+  <node id="earned-node" type="circle" label="Старт" rotation="0">
     <status state="earned" />
     <geometry x="80" y="80" radius="24" />
     <background color="#111111" />
   </node>
-  <node id="locked-node" type="rectangle" label="" rotation="0">
+  <node id="locked-node" type="rectangle" label="Экзамен" rotation="0">
     <status state="locked" />
     <geometry x="180" y="55" width="90" height="50" />
     <background color="#222222" />
@@ -34,12 +34,12 @@ export const refreshedAchievementGraphXml = `<?xml version="1.0" encoding="UTF-8
   <background>
     <fill color="#f0f4ff" />
   </background>
-  <node id="earned-node" type="circle" label="" rotation="0">
+  <node id="earned-node" type="circle" label="Старт" rotation="0">
     <status state="earned" />
     <geometry x="80" y="80" radius="24" />
     <background color="#111111" />
   </node>
-  <node id="locked-node" type="rectangle" label="" rotation="0">
+  <node id="locked-node" type="rectangle" label="Экзамен" rotation="0">
     <status state="earned" />
     <geometry x="180" y="55" width="90" height="50" />
     <background color="#222222" />

@@ -35,7 +35,7 @@ function isBaseArrow(type: string): type is BaseArrow {
 }
 
 export class Dialect {
-    // пока просто соединяем новое название (или нет) с базовым с лимитами и заданием значений позже
+    // РїРѕРєР° РїСЂРѕСЃС‚Рѕ СЃРѕРµРґРёРЅСЏРµРј РЅРѕРІРѕРµ РЅР°Р·РІР°РЅРёРµ (РёР»Рё РЅРµС‚) СЃ Р±Р°Р·РѕРІС‹Рј СЃ Р»РёРјРёС‚Р°РјРё Рё Р·Р°РґР°РЅРёРµРј Р·РЅР°С‡РµРЅРёР№ РїРѕР·Р¶Рµ
     name: string = ""
     nodeTypes: Map<string, string>;
     edgeTypes: Map<string, string>;
@@ -122,7 +122,7 @@ export class Dialect {
     }
 }
 
-//// Глобальное хранилище диалектов
+//// Р“Р»РѕР±Р°Р»СЊРЅРѕРµ С…СЂР°РЅРёР»РёС‰Рµ РґРёР°Р»РµРєС‚РѕРІ
 //export const dialectRegistry = new Map<string, Dialect>();
 
 //export function registerDialect(name: string, dialect: Dialect): void {
