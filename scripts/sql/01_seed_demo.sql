@@ -72,7 +72,7 @@ VALUES
     'First Assignment',
     'Student submitted first assignment',
     2026,
-    'Rare',
+    'rare',
     'semantic',
     'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
     '22222222-2222-2222-2222-222222222222'
