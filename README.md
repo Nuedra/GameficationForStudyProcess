@@ -63,7 +63,9 @@ export PLATFORM_DB_CONNECTION="Host=localhost;Port=5432;Database=platform;Userna
 5. Примените миграции:
 
 ```bash
-dotnet ef database update --project "Platform.DataAccess.Postgress/Platform.DataAccess.Postgress.csproj"
+dotnet ef database update \
+  --project "Platform.DataAccess.Postgress/Platform.DataAccess.Postgress.csproj" \
+  --startup-project "Platform.DataAccess.Postgress/Platform.DataAccess.Postgress.csproj"
 ```
 
 ## Проверка тестовых запросов к БД
@@ -102,7 +104,7 @@ docker compose down
 После применения миграций загрузите отдельный набор данных:
 
 ```bash
-docker exec -i nir-platform-postgres psql -U postgres -d platform < "scripts/sql/03_seed_student_api.sql"
+docker exec -i nir-platform-postgres psql -v ON_ERROR_STOP=1 -U postgres -d platform < "scripts/sql/03_seed_student_api.sql"
 ```
 
 Он создаёт 20 студентов, две группы, два курса с прочтением за 2026 год и
@@ -118,6 +120,31 @@ Swagger доступен при запуске в Development:
 
 ```text
 http://localhost:5284/swagger
+```
+
+Если seed падает с ошибкой вида
+`column "ContentScopeID" of relation "courses" does not exist`, значит в этой
+локальной базе ещё не применена миграция с экземплярами курсов и учебными
+группами. Повторите применение миграций командой из раздела выше и затем
+запустите seed ещё раз. Проверить наличие колонки можно так:
+
+```bash
+docker exec -i nir-platform-postgres psql -U postgres -d platform -c '\d "courses"'
+```
+
+В таблице `courses` должна быть колонка `ContentScopeID`.
+
+Если это полностью локальная тестовая база и данные в ней не нужны, можно
+пересоздать контейнер и volume, а затем заново выполнить миграции и seed:
+
+```bash
+docker compose down -v
+docker compose up -d
+export PLATFORM_DB_CONNECTION="Host=localhost;Port=5432;Database=platform;Username=postgres;Password=pass"
+dotnet ef database update \
+  --project "Platform.DataAccess.Postgress/Platform.DataAccess.Postgress.csproj" \
+  --startup-project "Platform.DataAccess.Postgress/Platform.DataAccess.Postgress.csproj"
+docker exec -i nir-platform-postgres psql -v ON_ERROR_STOP=1 -U postgres -d platform < "scripts/sql/03_seed_student_api.sql"
 ```
 
 ## Проверка генерации XML-графа достижений
@@ -136,7 +163,7 @@ Platform.Application/Templates/achievement-graph.xml
 2. Загрузите seed для студенческого API:
 
 ```bash
-docker exec -i nir-platform-postgres psql -U postgres -d platform < "scripts/sql/03_seed_student_api.sql"
+docker exec -i nir-platform-postgres psql -v ON_ERROR_STOP=1 -U postgres -d platform < "scripts/sql/03_seed_student_api.sql"
 ```
 
 3. Запустите приложение:
@@ -191,3 +218,70 @@ http://localhost:5284/swagger
 
 Сначала выполните `POST /api/auth/student/login`, затем
 `GET /api/student/courses/{courseId}/{year}/achievements/graph`.
+
+## Проверка отрисовки XML-графа на странице приложения
+
+В `Platform.Application` добавлена минимальная страница без отдельного
+оформления фронта: она берёт XML из API и передаёт его в canvas-компонент
+отрисовки.
+
+1. Поднимите PostgreSQL, примените миграции и загрузите seed:
+
+```bash
+docker compose up -d
+export PLATFORM_DB_CONNECTION="Host=localhost;Port=5432;Database=platform;Username=postgres;Password=pass"
+dotnet ef database update \
+  --project "Platform.DataAccess.Postgress/Platform.DataAccess.Postgress.csproj" \
+  --startup-project "Platform.DataAccess.Postgress/Platform.DataAccess.Postgress.csproj"
+docker exec -i nir-platform-postgres psql -v ON_ERROR_STOP=1 -U postgres -d platform < "scripts/sql/03_seed_student_api.sql"
+```
+
+2. Запустите приложение:
+
+```bash
+dotnet run --project "Platform.Application/Platform.Application.csproj" --launch-profile http
+```
+
+3. Откройте Swagger в том же браузере, в котором будете смотреть граф:
+
+```text
+http://localhost:5284/swagger
+```
+
+4. Выполните `POST /api/auth/student/login` с телом:
+
+```json
+{
+  "id": "b0000000-0000-0000-0000-000000000001"
+}
+```
+
+После успешного ответа браузер получит cookie `Platform.Student`.
+
+5. Откройте страницу графа:
+
+```text
+http://localhost:5284/achievement-graph-demo
+```
+
+или явный маршрут для первого тестового курса:
+
+```text
+http://localhost:5284/student/courses/a1000000-0000-0000-0000-000000000001/2026/achievement-graph
+```
+
+6. Нажмите кнопку `Отрисовать граф`.
+
+Страница вызывает:
+
+```text
+GET /api/student/courses/a1000000-0000-0000-0000-000000000001/2026/achievements/graph
+```
+
+API возвращает XML из шаблона `Platform.Application/Templates/achievement-graph.xml`
+с проставленными статусами нод и рёбер, а страница передаёт этот XML в
+`GraphComponent`.
+
+Если страница показывает сообщение `Сначала выполните вход студентом`, значит
+cookie была создана не в этом браузере или срок сессии истёк. Повторите вход
+через Swagger и обновите страницу графа.

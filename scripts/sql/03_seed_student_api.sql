@@ -3,6 +3,19 @@
 
 BEGIN;
 
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'courses'
+          AND column_name = 'ContentScopeID'
+    ) THEN
+        RAISE EXCEPTION 'Local database schema is outdated: courses.ContentScopeID is missing. Apply EF Core migrations before running 03_seed_student_api.sql.';
+    END IF;
+END $$;
+
 -- Keep demo achievement IDs aligned with AchivementId values in
 -- Platform.Application/Templates/achievement-graph.xml.
 DELETE FROM "achievement_connections"
@@ -216,7 +229,7 @@ VALUES
     'Полиморфные структуры',
     'Выполнены задания по полиморфным структурам',
     2026,
-    'Rare',
+    'rare',
     'types',
     NULL,
     'a1000000-0000-0000-0000-000000000001'
@@ -226,7 +239,7 @@ VALUES
     'Абстрактные типы',
     'Выполнена продвинутая ветка курса',
     2026,
-    'Epic',
+    'epic',
     'abstract',
     NULL,
     'a1000000-0000-0000-0000-000000000001'
@@ -246,7 +259,7 @@ VALUES
     'Эффективный поиск',
     'Выполнены задания по алгоритмам поиска',
     2026,
-    'Rare',
+    'rare',
     'search',
     NULL,
     'a1000000-0000-0000-0000-000000000002'
