@@ -1,0 +1,65 @@
+@page "/profile"
+@inject IJSRuntime JsRuntime
+
+<PageTitle>Профиль студента — Платформа достижений</PageTitle>
+
+<h1>Профиль студента</h1>
+
+@if (_isLoading)
+{
+    <div class="d-flex align-items-center gap-2 mt-3">
+        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+        <span class="text-muted">Загрузка...</span>
+    </div>
+}
+else if (_student == null)
+{
+    <div class="alert alert-warning mt-3">
+        <span class="oi oi-warning me-2" aria-hidden="true"></span>
+        Необходимо <a href="login">войти в систему</a>, чтобы просматривать профиль.
+    </div>
+}
+else
+{
+    <div class="card profile-card mt-3" style="max-width: 480px;">
+        <div class="card-body p-4">
+            <div class="d-flex align-items-center mb-3">
+                <div class="profile-avatar me-3">
+                    <span class="oi oi-person" aria-hidden="true"></span>
+                </div>
+                <div>
+                    <h4 class="mb-0">@_student.FullName</h4>
+                    <p class="text-muted mb-0">@_student.Group</p>
+                </div>
+            </div>
+            <hr />
+            <dl class="row mb-0">
+                <dt class="col-sm-4">Группа</dt>
+                <dd class="col-sm-8">@_student.Group</dd>
+                <dt class="col-sm-4">ID</dt>
+                <dd class="col-sm-8"><code class="small">@_student.Id</code></dd>
+            </dl>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _isLoading = true;
+    private StudentInfo? _student;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        _student = await JsRuntime.InvokeAsync<StudentInfo?>("platformApi.getCurrentStudent");
+        _isLoading = false;
+        StateHasChanged();
+    }
+
+    private sealed class StudentInfo
+    {
+        public Guid Id { get; set; }
+        public string FullName { get; set; } = "";
+        public string Group { get; set; } = "";
+    }
+}

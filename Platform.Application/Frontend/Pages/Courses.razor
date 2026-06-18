@@ -1,0 +1,83 @@
+@page "/courses"
+@inject IJSRuntime JsRuntime
+
+<PageTitle>Курсы — Платформа достижений</PageTitle>
+
+<h1>Мои курсы</h1>
+
+@if (_isLoading)
+{
+    <div class="d-flex align-items-center gap-2 mt-3">
+        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+        <span class="text-muted">Загрузка...</span>
+    </div>
+}
+else if (!_isAuthenticated)
+{
+    <div class="alert alert-warning mt-3">
+        <span class="oi oi-warning me-2" aria-hidden="true"></span>
+        Необходимо <a href="login">войти в систему</a>, чтобы просматривать курсы.
+    </div>
+}
+else if (_courses == null || _courses.Length == 0)
+{
+    <div class="alert alert-info mt-3">
+        Курсы не найдены. Обратитесь к администратору.
+    </div>
+}
+else
+{
+    <div class="row g-3 mt-1">
+        @foreach (var course in _courses)
+        {
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 course-card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h5 class="card-title mb-0">@course.Title</h5>
+                            <span class="badge bg-secondary ms-2">@course.Year</span>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(course.Description))
+                        {
+                            <p class="card-text text-muted small">@course.Description</p>
+                        }
+                    </div>
+                    <div class="card-footer bg-transparent border-top-0 pt-0">
+                        <a href="student/courses/@course.Id/@course.Year/achievement-graph"
+                           class="btn btn-outline-primary btn-sm">
+                            <span class="oi oi-graph me-1" aria-hidden="true"></span>Граф достижений
+                        </a>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private bool _isLoading = true;
+    private bool _isAuthenticated;
+    private CourseInfo[]? _courses;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        var student = await JsRuntime.InvokeAsync<object?>("platformApi.getCurrentStudent");
+        _isAuthenticated = student != null;
+
+        if (_isAuthenticated)
+            _courses = await JsRuntime.InvokeAsync<CourseInfo[]?>("platformApi.getCourses");
+
+        _isLoading = false;
+        StateHasChanged();
+    }
+
+    private sealed class CourseInfo
+    {
+        public Guid Id { get; set; }
+        public string Title { get; set; } = "";
+        public string Description { get; set; } = "";
+        public int Year { get; set; }
+    }
+}

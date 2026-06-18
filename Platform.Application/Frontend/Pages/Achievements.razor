@@ -1,0 +1,181 @@
+@page "/achievements"
+@inject IJSRuntime JsRuntime
+
+<PageTitle>Достижения — Платформа достижений</PageTitle>
+
+<h1>Достижения</h1>
+
+@if (_isLoading)
+{
+    <div class="d-flex align-items-center gap-2 mt-3">
+        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+        <span class="text-muted">Загрузка...</span>
+    </div>
+}
+else if (!_isAuthenticated)
+{
+    <div class="alert alert-warning mt-3">
+        <span class="oi oi-warning me-2" aria-hidden="true"></span>
+        Необходимо <a href="login">войти в систему</a>, чтобы просматривать достижения.
+    </div>
+}
+else if (_courses == null || _courses.Length == 0)
+{
+    <div class="alert alert-info mt-3">Курсы не найдены. Обратитесь к администратору.</div>
+}
+else
+{
+    @if (_courses.Length > 1)
+    {
+        <div class="mb-3" style="max-width: 420px;">
+            <label for="courseSelect" class="form-label">Учебный год</label>
+            <select id="courseSelect" class="form-select" @onchange="OnCourseChangedAsync">
+                @foreach (var (course, idx) in _courses.Select((c, i) => (c, i)))
+                {
+                    <option value="@($"{course.Id}:{course.Year}")">@CourseDisplayName(course, idx)</option>
+                }
+            </select>
+        </div>
+    }
+    else
+    {
+        <p class="text-muted mb-3">
+            <span class="oi oi-book me-1" aria-hidden="true"></span>
+            @_courses[0].Title &nbsp;·&nbsp; @_courses[0].Year
+        </p>
+    }
+
+    <div class="achievement-legend mb-3">
+        <div class="legend-item">
+            <span class="legend-dot legend-earned"></span>
+            <span>Заработанная ачивка</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-dot legend-available"></span>
+            <span>Доступная для получения</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-dot legend-locked"></span>
+            <span>Недоступная ачивка</span>
+        </div>
+    </div>
+
+    <div class="d-flex align-items-center gap-2 mb-2">
+        <button class="btn btn-primary btn-sm" @onclick="RefreshGraphAsync" disabled="@_graphLoading">
+            @if (_graphLoading)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                <span>Обновление...</span>
+            }
+            else
+            {
+                <span class="oi oi-reload me-1" aria-hidden="true"></span>
+                <span>Обновить граф</span>
+            }
+        </button>
+    </div>
+
+    @if (_graphError != null)
+    {
+        <div class="alert alert-danger py-2">@_graphError</div>
+    }
+
+    <div id="@_graphElementId" class="achievement-graph-host"></div>
+}
+
+@code {
+    private const string GraphElementId = "achievements-graph-main";
+    private readonly string _graphElementId = GraphElementId;
+
+    private bool _isLoading = true;
+    private bool _isAuthenticated;
+    private CourseInfo[]? _courses;
+    private Guid _selectedCourseId;
+    private int _selectedYear;
+    private bool _graphLoading;
+    private string? _graphError;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        var student = await JsRuntime.InvokeAsync<object?>("platformApi.getCurrentStudent");
+        _isAuthenticated = student != null;
+
+        if (_isAuthenticated)
+        {
+            _courses = await JsRuntime.InvokeAsync<CourseInfo[]?>("platformApi.getCourses");
+
+            if (_courses?.Length > 0)
+            {
+                _selectedCourseId = _courses[0].Id;
+                _selectedYear = _courses[0].Year;
+            }
+        }
+
+        _isLoading = false;
+        StateHasChanged();
+
+        if (_isAuthenticated && _selectedCourseId != Guid.Empty)
+            await LoadGraphAsync(false);
+    }
+
+    private async Task OnCourseChangedAsync(ChangeEventArgs e)
+    {
+        var val = e.Value?.ToString() ?? "";
+        var colon = val.IndexOf(':');
+        if (colon > 0
+            && Guid.TryParse(val[..colon], out var courseId)
+            && int.TryParse(val[(colon + 1)..], out var year))
+        {
+            _selectedCourseId = courseId;
+            _selectedYear = year;
+            await LoadGraphAsync(false);
+        }
+    }
+
+    private async Task RefreshGraphAsync()
+    {
+        await LoadGraphAsync(true);
+    }
+
+    private async Task LoadGraphAsync(bool useRefresh)
+    {
+        if (_selectedCourseId == Guid.Empty) return;
+
+        _graphLoading = true;
+        _graphError = null;
+        StateHasChanged();
+
+        try
+        {
+            var jsFunc = useRefresh
+                ? "achievementGraphHost.renderRefresh"
+                : "achievementGraphHost.render";
+            var error = await JsRuntime.InvokeAsync<string>(
+                jsFunc, _graphElementId, _selectedCourseId, _selectedYear);
+            _graphError = string.IsNullOrWhiteSpace(error) ? null : error;
+        }
+        finally
+        {
+            _graphLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private static readonly string[] CourseAliases = ["ДМ-5", "Информатика"];
+
+    private string CourseDisplayName(CourseInfo course, int index)
+    {
+        var alias = index < CourseAliases.Length ? CourseAliases[index] : course.Title;
+        return alias == "Информатика" ? $"Информатика {course.Year}" : alias;
+    }
+
+    private sealed class CourseInfo
+    {
+        public Guid Id { get; set; }
+        public string Title { get; set; } = "";
+        public string Description { get; set; } = "";
+        public int Year { get; set; }
+    }
+}

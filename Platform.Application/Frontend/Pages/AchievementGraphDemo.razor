@@ -1,0 +1,98 @@
+@page "/achievement-graph-demo"
+@page "/student/courses/{CourseId:guid}/{Year:int}/achievement-graph"
+@inject IJSRuntime JsRuntime
+
+<PageTitle>Граф достижений</PageTitle>
+
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <h1 class="mb-0">Граф достижений</h1>
+    <div class="d-flex gap-2">
+        <button class="btn btn-primary" @onclick="DrawGraphAsync" disabled="@_isLoading">
+            @if (_isLoading)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                <span>Загрузка...</span>
+            }
+            else
+            {
+                <span class="oi oi-reload me-1" aria-hidden="true"></span>
+                <span>Обновить</span>
+            }
+        </button>
+        <a href="courses" class="btn btn-outline-secondary">
+            <span class="oi oi-arrow-left me-1" aria-hidden="true"></span>Курсы
+        </a>
+    </div>
+</div>
+
+<p class="text-muted small mb-2">
+    Курс: <code>@ResolvedCourseId</code> &nbsp;·&nbsp; Год: <code>@ResolvedYear</code>
+</p>
+
+@if (!string.IsNullOrWhiteSpace(_message))
+{
+    <div class="alert @(_isError ? "alert-danger" : "alert-success") py-2 achievement-graph-message">
+        @_message
+    </div>
+}
+
+<div id="@_graphElementId" class="achievement-graph-host"></div>
+
+@code {
+    private static readonly Guid DefaultCourseId =
+        Guid.Parse("a1000000-0000-0000-0000-000000000001");
+
+    private readonly string _graphElementId = $"achievement-graph-{Guid.NewGuid():N}";
+    private bool _isLoading;
+    private bool _isError;
+    private string? _message;
+
+    [Parameter]
+    public Guid CourseId { get; set; } = DefaultCourseId;
+
+    [Parameter]
+    public int Year { get; set; } = 2026;
+
+    private Guid ResolvedCourseId => CourseId == Guid.Empty ? DefaultCourseId : CourseId;
+    private int ResolvedYear => Year <= 0 ? 2026 : Year;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await DrawGraphAsync();
+    }
+
+    private async Task DrawGraphAsync()
+    {
+        _isLoading = true;
+        _message = null;
+        _isError = false;
+        StateHasChanged();
+
+        try
+        {
+            var errorMessage = await JsRuntime.InvokeAsync<string>(
+                "achievementGraphHost.render",
+                _graphElementId,
+                ResolvedCourseId,
+                ResolvedYear,
+                1100,
+                650);
+
+            if (string.IsNullOrWhiteSpace(errorMessage))
+            {
+                _message = "Граф успешно загружен.";
+                _isError = false;
+            }
+            else
+            {
+                _message = errorMessage;
+                _isError = true;
+            }
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

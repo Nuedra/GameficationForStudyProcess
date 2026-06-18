@@ -2,6 +2,14 @@
     const mountedApps = new Map();
 
     async function render(elementId, courseId, year, width, height) {
+        return await loadGraph(elementId, courseId, year, width, height, false);
+    }
+
+    async function renderRefresh(elementId, courseId, year, width, height) {
+        return await loadGraph(elementId, courseId, year, width, height, true);
+    }
+
+    async function loadGraph(elementId, courseId, year, width, height, useRefresh) {
         const container = document.getElementById(elementId);
         if (!container)
             return "Контейнер графа не найден.";
@@ -10,18 +18,25 @@
         if (!window.Vue || !graphLibrary?.GraphComponent)
             return "Компонент графа не загружен.";
 
+        // Adaptive: use the container's actual pixel width
+        const containerWidth = container.offsetWidth;
+        const effectiveWidth = containerWidth > 100 ? containerWidth : (width || 900);
+        const effectiveHeight = (width && height)
+            ? Math.round(height * effectiveWidth / width)
+            : Math.round(effectiveWidth * 0.62);
+
         unmount(elementId);
         container.textContent = "Загрузка графа...";
 
         try {
-            const response = await fetch(
-                `/api/student/courses/${courseId}/${year}/achievements/graph`,
-                {
-                    credentials: "include",
-                    headers: {
-                        Accept: "application/xml"
-                    }
-                });
+            const baseUrl = `/api/student/courses/${courseId}/${year}/achievements/graph`;
+            const url = useRefresh ? `${baseUrl}/refresh` : baseUrl;
+
+            const response = await fetch(url, {
+                method: useRefresh ? 'POST' : 'GET',
+                credentials: "include",
+                headers: { Accept: "application/xml" }
+            });
 
             if (!response.ok) {
                 container.textContent = "";
@@ -35,14 +50,27 @@
                 render() {
                     return window.Vue.h(graphLibrary.GraphComponent, {
                         xmlData: xml,
-                        width,
-                        height
+                        width: effectiveWidth,
+                        height: effectiveHeight
                     });
                 }
             });
 
             app.mount(container);
             mountedApps.set(elementId, app);
+
+            // loadGraphFromXml is async and internally does `await initializeGraphFromXml()`.
+            // That `await` introduces one extra microtask boundary even though
+            // initializeGraphFromXml has no real async work.
+            //
+            // Microtask order after app.mount():
+            //   1st nextTick → loadGraphFromXml starts, suspends at `await init…`
+            //   2nd nextTick → init… continuation runs (graph + nodes created, RAF scheduled)
+            //   fitGraphViewport runs → sets viewport on the SAME pending RAF → no flash
+            await window.Vue.nextTick();
+            await window.Vue.nextTick();
+            fitGraphViewport(container, effectiveWidth, effectiveHeight);
+
             return "";
         } catch (error) {
             unmount(elementId);
@@ -52,13 +80,78 @@
         }
     }
 
+    // Compute bounding box of all nodes and set scale + offset so the full graph
+    // fits in the canvas, centered.  Runs before the first RAF draw → no flash.
+    function fitGraphViewport(container, canvasW, canvasH) {
+        try {
+            // Vue 3 internal path: app._instance.subTree.component.data.graph
+            const graph =
+                container.__vue_app__
+                          ?._instance
+                          ?.subTree
+                          ?.component
+                          ?.data
+                          ?.graph;
+
+            if (!graph || !Array.isArray(graph._nodes) || graph._nodes.length === 0)
+                return;
+
+            let minX = Infinity, minY = Infinity,
+                maxX = -Infinity, maxY = -Infinity;
+
+            for (const node of graph._nodes) {
+                const x = node._x ?? 0;
+                const y = node._y ?? 0;
+
+                // Circle: center (x,y), radius
+                // Rectangle / other: top-left (x,y), width/height
+                if (node._radius !== undefined) {
+                    minX = Math.min(minX, x - node._radius);
+                    maxX = Math.max(maxX, x + node._radius);
+                    minY = Math.min(minY, y - node._radius);
+                    maxY = Math.max(maxY, y + node._radius);
+                } else {
+                    const w = node._width  ?? 0;
+                    const h = node._height ?? 0;
+                    minX = Math.min(minX, x);
+                    maxX = Math.max(maxX, x + w);
+                    minY = Math.min(minY, y);
+                    maxY = Math.max(maxY, y + h);
+                }
+            }
+
+            if (minX === Infinity) return;
+
+            const pad      = 60;
+            const contentW = maxX - minX + pad * 2;
+            const contentH = maxY - minY + pad * 2;
+
+            // Scale to fit the whole graph inside the canvas
+            const fitScale = Math.min(canvasW / contentW, canvasH / contentH);
+
+            const centerX = (minX + maxX) / 2;
+            const centerY = (minY + maxY) / 2;
+
+            // Set viewport directly — TypeScript 'private' is compile-time only
+            graph._scale   = fitScale;
+            graph._offsetX = canvasW / 2 - centerX * fitScale;
+            graph._offsetY = canvasH / 2 - centerY * fitScale;
+
+            // requestRedraw is NOT called here:
+            // loadGraphFromXml already scheduled an RAF; that RAF will use
+            // the viewport values we just set above.
+
+        } catch (_) {
+            // Viewport fitting failed — the graph will open with default viewport
+        }
+    }
+
     function unmount(elementId) {
         const existing = mountedApps.get(elementId);
         if (existing) {
             existing.unmount();
             mountedApps.delete(elementId);
         }
-
         const container = document.getElementById(elementId);
         if (container)
             container.textContent = "";
@@ -71,13 +164,13 @@
             return "У студента нет доступа к этому курсу.";
         if (response.status === 404)
             return "Курс за указанный год не найден.";
-
         const body = await response.text();
         return body || `API вернул ошибку ${response.status}.`;
     }
 
     window.achievementGraphHost = {
         render,
+        renderRefresh,
         unmount
     };
 })();
