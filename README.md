@@ -255,7 +255,7 @@ http://localhost:5284/swagger
 
 ```bash
 docker compose up -d
-export PLATFORM_DB_CONNECTION="Host=localhost;Port=5432;Database=platform;Username=postgres;Password=pass"
+export PLATFORM_DB_CONNECTION="Host=localhost;Port=5433;Database=platform;Username=postgres;Password=pass"
 dotnet ef database update \
   --project "Platform.DataAccess.Postgress/Platform.DataAccess.Postgress.csproj" \
   --startup-project "Platform.DataAccess.Postgress/Platform.DataAccess.Postgress.csproj"
