@@ -6,6 +6,10 @@
 **/coverage/
 **/node_modules/
 
+# Local project documents, presentations, renders, and assistant settings
+/project-materials/
+/.claude/
+
 # User-specific files
 *.user
 *.rsuser

@@ -42,6 +42,18 @@ dotnet run --project "Platform.Application/Platform.Application.csproj"
 cp ".env.example" ".env"
 ```
 
+Если на macOS уже установлен локальный PostgreSQL, он может занимать
+`localhost:5432`. Проверить это можно так:
+
+```bash
+lsof -nP -iTCP:5432 -sTCP:LISTEN
+```
+
+Если в выводе есть процесс `postgres`, поменяйте в `.env` порт контейнера на
+`POSTGRES_PORT=5433` и дальше используйте `Port=5433` в
+`PLATFORM_DB_CONNECTION`. Иначе `dotnet ef` может применить миграции в локальную
+PostgreSQL, а seed через `docker exec` будет выполняться в пустую Docker-БД.
+
 2. Поднимите PostgreSQL:
 
 ```bash
