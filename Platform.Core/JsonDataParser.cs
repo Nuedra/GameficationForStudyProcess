@@ -4,6 +4,10 @@ namespace Platform.Core.Parsing;
 
 public static class JsonDataParser
 {
+    /// <summary>
+    /// Разбирает произвольный JSON в словарь. Парсер сохранён как возможный адаптер
+    /// будущего внешнего API, но не участвует в текущем цикле выдачи достижений.
+    /// </summary>
     public static Dictionary<string, object?> ParseToDictionary(string json)
     {
         if (string.IsNullOrWhiteSpace(json))
