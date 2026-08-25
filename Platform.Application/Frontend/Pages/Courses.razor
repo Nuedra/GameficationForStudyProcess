@@ -12,6 +12,13 @@
         <span class="text-muted">Загрузка...</span>
     </div>
 }
+else if (_error != null)
+{
+    <div class="alert alert-danger mt-3">
+        @_error
+        <button class="btn btn-outline-danger btn-sm ms-2" @onclick="LoadCoursesAsync">Повторить</button>
+    </div>
+}
 else if (!_isAuthenticated)
 {
     <div class="alert alert-warning mt-3">
@@ -58,19 +65,50 @@ else
     private bool _isLoading = true;
     private bool _isAuthenticated;
     private CourseInfo[]? _courses;
+    private string? _error;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
 
-        var student = await JsRuntime.InvokeAsync<object?>("platformApi.getCurrentStudent");
-        _isAuthenticated = student != null;
+        await LoadCoursesAsync();
+    }
 
-        if (_isAuthenticated)
-            _courses = await JsRuntime.InvokeAsync<CourseInfo[]?>("platformApi.getCourses");
-
-        _isLoading = false;
+    private async Task LoadCoursesAsync()
+    {
+        _isLoading = true;
+        _error = null;
         StateHasChanged();
+
+        try
+        {
+            var session = await JsRuntime.InvokeAsync<SessionResult>("platformApi.getCurrentStudent");
+            _isAuthenticated = session.Success;
+            if (!session.Success)
+            {
+                if (session.Status != 401)
+                    _error = session.Message ?? "Не удалось проверить сессию.";
+                return;
+            }
+
+            var result = await JsRuntime.InvokeAsync<CoursesResult>("platformApi.getCourses");
+            if (result.Success)
+                _courses = result.Courses;
+            else
+            {
+                _isAuthenticated = result.Status == 401 ? false : _isAuthenticated;
+                _error = result.Message ?? "Не удалось загрузить список курсов.";
+            }
+        }
+        catch
+        {
+            _error = "Не удалось связаться с сервером. Проверьте подключение и повторите запрос.";
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
     }
 
     private sealed class CourseInfo
@@ -79,5 +117,20 @@ else
         public string Title { get; set; } = "";
         public string Description { get; set; } = "";
         public int Year { get; set; }
+    }
+
+    private sealed class SessionResult
+    {
+        public bool Success { get; set; }
+        public int Status { get; set; }
+        public string? Message { get; set; }
+    }
+
+    private sealed class CoursesResult
+    {
+        public bool Success { get; set; }
+        public int Status { get; set; }
+        public string? Message { get; set; }
+        public CourseInfo[]? Courses { get; set; }
     }
 }

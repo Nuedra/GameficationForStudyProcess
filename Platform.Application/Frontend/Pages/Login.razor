@@ -90,6 +90,10 @@
 
             Navigation.NavigateTo("/");
         }
+        catch
+        {
+            _error = "Не удалось выполнить вход. Проверьте подключение к серверу и повторите запрос.";
+        }
         finally
         {
             _isLoading = false;
@@ -99,6 +103,7 @@
     private sealed class LoginResult
     {
         public bool Success { get; set; }
+        public int Status { get; set; }
         public string? Message { get; set; }
         public StudentInfo? Student { get; set; }
     }

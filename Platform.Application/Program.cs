@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Platform.Application.Contracts;
+using Platform.Application.Middleware;
 using Platform.Application.Services;
 using Platform.Application.Swagger;
 using Platform.Core.AchievementGraphs;
@@ -101,6 +102,8 @@ builder.Services.AddScoped(serviceProvider => new AchievementProcessingCycle(
 
 var app = builder.Build();
 
+app.UseMiddleware<ApiExceptionMiddleware>();
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
@@ -135,8 +138,8 @@ app.MapGet("/health/ready", async (
     }
 
     return Results.Problem(
-        title: "Database is unavailable",
-        detail: "Start the local database with scripts/local-setup.sh and verify the connection settings in .env.",
+        title: "База данных недоступна",
+        detail: "Проверьте, что база данных запущена и настройки подключения корректны.",
         statusCode: StatusCodes.Status503ServiceUnavailable);
 }).AllowAnonymous();
 

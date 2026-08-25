@@ -57,6 +57,19 @@ public sealed class StudentApiTests(StudentApiFactory factory)
     }
 
     [Fact]
+    public async Task Login_EmptyStudentId_ReturnsValidationError()
+    {
+        using var client = CreateClient();
+
+        var response = await Login(client, Guid.Empty);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ApiErrorDto>(JsonOptions);
+        Assert.Equal("invalid_student_id", error!.Code);
+        Assert.NotEmpty(error.Message);
+    }
+
+    [Fact]
     public async Task Courses_WithoutAuthentication_ReturnsUnauthorizedJson()
     {
         using var client = CreateClient();
@@ -116,6 +129,21 @@ public sealed class StudentApiTests(StudentApiFactory factory)
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         var error = await response.Content.ReadFromJsonAsync<ApiErrorDto>(JsonOptions);
         Assert.Equal("course_access_denied", error!.Code);
+    }
+
+    [Fact]
+    public async Task AchievementGraphRefresh_WithoutAuthentication_ReturnsUnauthorizedJson()
+    {
+        using var client = CreateClient();
+
+        var response = await client.PostAsync(
+            $"/api/student/courses/{StudentApiFactory.CourseId}/2026/achievements/graph/refresh",
+            content: null);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ApiErrorDto>(JsonOptions);
+        Assert.Equal("authentication_required", error!.Code);
+        Assert.NotEmpty(error.Message);
     }
 
     [Fact]
