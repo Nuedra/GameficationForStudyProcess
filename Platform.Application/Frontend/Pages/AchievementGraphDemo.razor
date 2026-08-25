@@ -90,6 +90,11 @@
                 _isError = true;
             }
         }
+        catch
+        {
+            _message = "Не удалось загрузить граф достижений. Проверьте подключение и повторите запрос.";
+            _isError = true;
+        }
         finally
         {
             _isLoading = false;

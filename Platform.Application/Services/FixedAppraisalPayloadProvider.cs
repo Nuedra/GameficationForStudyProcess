@@ -4,6 +4,11 @@ namespace Platform.Application.Services;
 
 public sealed class FixedAppraisalPayloadProvider : IAppraisalPayloadProvider
 {
+    private static readonly Guid DemoStudentId =
+        Guid.Parse("b0000000-0000-0000-0000-000000000001");
+    private static readonly Guid DemoCourseId =
+        Guid.Parse("a1000000-0000-0000-0000-000000000001");
+
     public Task<IReadOnlyList<AppraisalPayloadDto>> GetPayloadsAsync(
         CancellationToken cancellationToken = default)
     {
@@ -13,32 +18,32 @@ public sealed class FixedAppraisalPayloadProvider : IAppraisalPayloadProvider
         [
             new AppraisalPayloadDto
             {
-                StudentId = Guid.Parse("3fa85f64-5717-4562-b3fc-2c963f66afa6"),
-                CourseId = Guid.Parse("ca761232-ed42-4fb3-818b-0ed1de24f5a2"),
-                Year = 2025,
+                StudentId = DemoStudentId,
+                CourseId = DemoCourseId,
+                Year = 2026,
                 AppraisalLists =
                 [
                     new AppraisalListDto
                     {
-                        ListId = Guid.Parse("b112948c-9c12-4211-9fa6-324cba4388b3"),
-                        ListName = "Текущая аттестация: Модуль 1",
-                        DateCreated = DateTimeOffset.Parse("2025-10-15T10:00:00Z"),
-                        DateClosed = DateTimeOffset.Parse("2025-11-01T18:00:00Z"),
+                        ListId = Guid.Parse("d3000000-0000-0000-0000-000000000001"),
+                        ListName = "Демонстрационная ведомость: обновление графа",
+                        DateCreated = DateTimeOffset.Parse("2026-05-15T10:00:00Z"),
+                        DateClosed = null,
                         Marks =
                         [
                             new AppraisalMarkDto
                             {
-                                ColumnId = Guid.Parse("1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d"),
-                                ColumnName = "Лабораторная работа №1",
+                                ColumnId = Guid.Parse("d4000000-0000-0000-0000-000000000003"),
+                                ColumnName = "Демонстрационное задание №3",
                                 IsComputed = false,
                                 MaxScore = 10,
                                 MinAcceptScore = 6,
-                                Score = 9,
-                                ScoreSourceName = "Иванов И.И.",
-                                UpdatedAt = DateTimeOffset.Parse("2025-10-20T14:35:00Z"),
-                                Tags = ["lab1_completed", "lab1_success"],
-                                Deadline = DateTimeOffset.Parse("2025-10-19T20:59:59Z"),
-                                UploadedAt = DateTimeOffset.Parse("2025-10-18T16:20:00Z")
+                                Score = 10,
+                                ScoreSourceName = "Демонстрационный преподаватель",
+                                UpdatedAt = DateTimeOffset.Parse("2026-05-15T12:00:00Z"),
+                                Tags = ["template_achievement_3"],
+                                Deadline = null,
+                                UploadedAt = DateTimeOffset.Parse("2026-05-15T11:30:00Z")
                             }
                         ]
                     }

@@ -3,7 +3,10 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Xml.Linq;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Platform.Application.Contracts;
+using Platform.DataAccess.Postgress;
 
 namespace Platform.Application.Tests;
 
@@ -11,6 +14,18 @@ public sealed class StudentApiTests(StudentApiFactory factory)
     : IClassFixture<StudentApiFactory>
 {
     private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
+
+    [Fact]
+    public async Task HealthReady_AvailableDatabase_ReturnsReady()
+    {
+        using var client = CreateClient();
+
+        var response = await client.GetAsync("/health/ready");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("ready", document.RootElement.GetProperty("status").GetString());
+    }
 
     [Fact]
     public async Task Login_ExistingStudent_ReturnsStudentAndPersistentCookie()
@@ -39,6 +54,19 @@ public sealed class StudentApiTests(StudentApiFactory factory)
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         var error = await response.Content.ReadFromJsonAsync<ApiErrorDto>(JsonOptions);
         Assert.Equal("invalid_credentials", error!.Code);
+    }
+
+    [Fact]
+    public async Task Login_EmptyStudentId_ReturnsValidationError()
+    {
+        using var client = CreateClient();
+
+        var response = await Login(client, Guid.Empty);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ApiErrorDto>(JsonOptions);
+        Assert.Equal("invalid_student_id", error!.Code);
+        Assert.NotEmpty(error.Message);
     }
 
     [Fact]
@@ -104,6 +132,21 @@ public sealed class StudentApiTests(StudentApiFactory factory)
     }
 
     [Fact]
+    public async Task AchievementGraphRefresh_WithoutAuthentication_ReturnsUnauthorizedJson()
+    {
+        using var client = CreateClient();
+
+        var response = await client.PostAsync(
+            $"/api/student/courses/{StudentApiFactory.CourseId}/2026/achievements/graph/refresh",
+            content: null);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ApiErrorDto>(JsonOptions);
+        Assert.Equal("authentication_required", error!.Code);
+        Assert.NotEmpty(error.Message);
+    }
+
+    [Fact]
     public async Task AchievementGraphRefresh_OwnCourse_RunsProcessingCycleAndReturnsUpdatedXml()
     {
         using var client = CreateClient();
@@ -126,6 +169,19 @@ public sealed class StudentApiTests(StudentApiFactory factory)
 
         Assert.Equal("earned", GetNodeStatus(document, "available"));
         Assert.Equal("earned", GetEdgeStatus(document, "edge-earned-available"));
+
+        var repeatedResponse = await client.PostAsync(
+            $"/api/student/courses/{StudentApiFactory.CourseId}/2026/achievements/graph/refresh",
+            content: null);
+        Assert.Equal(HttpStatusCode.OK, repeatedResponse.StatusCode);
+
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+        var assignedCount = await dbContext.StudentAchievements.CountAsync(item =>
+            item.StudentID == StudentApiFactory.StudentId &&
+            item.AchievementID == StudentApiFactory.LockedAchievementId);
+
+        Assert.Equal(1, assignedCount);
     }
 
     private HttpClient CreateClient()

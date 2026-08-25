@@ -74,9 +74,7 @@
             return "";
         } catch (error) {
             unmount(elementId);
-            return error instanceof Error
-                ? error.message
-                : "Не удалось загрузить граф достижений.";
+            return "Не удалось загрузить граф достижений. Повторите запрос.";
         }
     }
 
@@ -164,8 +162,8 @@
             return "У студента нет доступа к этому курсу.";
         if (response.status === 404)
             return "Курс за указанный год не найден.";
-        const body = await response.text();
-        return body || `API вернул ошибку ${response.status}.`;
+        const error = await response.json().catch(() => null);
+        return error?.message || "Не удалось загрузить граф достижений. Повторите запрос.";
     }
 
     window.achievementGraphHost = {

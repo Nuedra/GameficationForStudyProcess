@@ -55,8 +55,15 @@
 
     private async Task RefreshStudentNameAsync()
     {
-        var student = await JsRuntime.InvokeAsync<StudentInfo?>("platformApi.getCurrentStudent");
-        _studentName = student?.FullName;
+        try
+        {
+            var session = await JsRuntime.InvokeAsync<SessionResult>("platformApi.getCurrentStudent");
+            _studentName = session.Success ? session.Student?.FullName : null;
+        }
+        catch
+        {
+            _studentName = null;
+        }
         await InvokeAsync(StateHasChanged);
     }
 
@@ -78,5 +85,11 @@
         public Guid Id { get; set; }
         public string FullName { get; set; } = "";
         public string Group { get; set; } = "";
+    }
+
+    private sealed class SessionResult
+    {
+        public bool Success { get; set; }
+        public StudentInfo? Student { get; set; }
     }
 }

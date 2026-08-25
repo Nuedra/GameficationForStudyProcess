@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using Platform.Application.Contracts;
+using Platform.Application.Middleware;
 using Platform.Application.Services;
 using Platform.Application.Swagger;
 using Platform.Core.AchievementGraphs;
@@ -13,6 +14,18 @@ using Platform.Core.Processing;
 using Platform.DataAccess.Postgress;
 
 var builder = WebApplication.CreateBuilder(args);
+
+string GetConnectionString() => PlatformDatabaseConnection.Require(
+    builder.Configuration.GetConnectionString(PlatformDatabaseConnection.ConnectionStringName));
+
+var enableHttpsRedirection = !builder.Environment.IsDevelopment() ||
+    builder.Configuration.GetValue<bool>("HttpsRedirection:Enabled");
+var httpsPort = builder.Configuration.GetValue<int?>("HttpsRedirection:HttpsPort");
+
+if (enableHttpsRedirection && httpsPort.HasValue)
+{
+    builder.Services.AddHttpsRedirection(options => options.HttpsPort = httpsPort.Value);
+}
 
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
@@ -72,9 +85,7 @@ builder.Services
 builder.Services.AddAuthorization();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddDbContext<PlatformDbContext>(options =>
-    options.UseNpgsql(
-        Environment.GetEnvironmentVariable("PLATFORM_DB_CONNECTION")
-        ?? "Host=localhost;Port=5432;Database=platform;Username=postgres;Password=pass"));
+    options.UseNpgsql(GetConnectionString()));
 builder.Services.AddScoped<IUserContextService, UserContextService>();
 builder.Services.AddScoped<IStudentIdentityService, StudentIdentityService>();
 builder.Services.AddScoped<IStudentCourseService, StudentCourseService>();
@@ -85,12 +96,13 @@ builder.Services.AddSingleton<IAppraisalPayloadParser, AppraisalPayloadParser>()
 builder.Services.AddSingleton<IAppraisalFactsExtractor, AppraisalFactsExtractor>();
 builder.Services.AddSingleton<IAppraisalPayloadProvider, FixedAppraisalPayloadProvider>();
 builder.Services.AddScoped(serviceProvider => new AchievementProcessingCycle(
-    Environment.GetEnvironmentVariable("PLATFORM_DB_CONNECTION")
-        ?? "Host=localhost;Port=5432;Database=platform;Username=postgres;Password=pass",
+    GetConnectionString(),
     serviceProvider.GetRequiredService<IAppraisalPayloadProvider>(),
     serviceProvider.GetRequiredService<IAppraisalFactsExtractor>()));
 
 var app = builder.Build();
+
+app.UseMiddleware<ApiExceptionMiddleware>();
 
 if (!app.Environment.IsDevelopment())
 {
@@ -103,11 +115,33 @@ else
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+if (enableHttpsRedirection)
+    app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.MapGet("/health/ready", async (
+    PlatformDbContext dbContext,
+    ILogger<Program> logger,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        if (await dbContext.Database.CanConnectAsync(cancellationToken))
+            return Results.Ok(new { status = "ready" });
+    }
+    catch (Exception exception)
+    {
+        logger.LogWarning(exception, "Database readiness check failed.");
+    }
+
+    return Results.Problem(
+        title: "База данных недоступна",
+        detail: "Проверьте, что база данных запущена и настройки подключения корректны.",
+        statusCode: StatusCodes.Status503ServiceUnavailable);
+}).AllowAnonymous();
 
 app.MapControllers();
 app.MapBlazorHub();

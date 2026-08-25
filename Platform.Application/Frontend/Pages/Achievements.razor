@@ -12,6 +12,13 @@
         <span class="text-muted">Загрузка...</span>
     </div>
 }
+else if (_pageError != null)
+{
+    <div class="alert alert-danger mt-3">
+        @_pageError
+        <button class="btn btn-outline-danger btn-sm ms-2" @onclick="LoadPageAsync">Повторить</button>
+    </div>
+}
 else if (!_isAuthenticated)
 {
     <div class="alert alert-warning mt-3">
@@ -94,29 +101,59 @@ else
     private int _selectedYear;
     private bool _graphLoading;
     private string? _graphError;
+    private string? _pageError;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
 
-        var student = await JsRuntime.InvokeAsync<object?>("platformApi.getCurrentStudent");
-        _isAuthenticated = student != null;
+        await LoadPageAsync();
+    }
 
-        if (_isAuthenticated)
+    private async Task LoadPageAsync()
+    {
+        _isLoading = true;
+        _pageError = null;
+        StateHasChanged();
+
+        try
         {
-            _courses = await JsRuntime.InvokeAsync<CourseInfo[]?>("platformApi.getCourses");
+            var session = await JsRuntime.InvokeAsync<SessionResult>("platformApi.getCurrentStudent");
+            _isAuthenticated = session.Success;
 
+            if (!session.Success)
+            {
+                if (session.Status != 401)
+                    _pageError = session.Message ?? "Не удалось проверить сессию.";
+                return;
+            }
+
+            var coursesResult = await JsRuntime.InvokeAsync<CoursesResult>("platformApi.getCourses");
+            if (!coursesResult.Success)
+            {
+                _isAuthenticated = coursesResult.Status == 401 ? false : _isAuthenticated;
+                _pageError = coursesResult.Message ?? "Не удалось загрузить список курсов.";
+                return;
+            }
+
+            _courses = coursesResult.Courses;
             if (_courses?.Length > 0)
             {
                 _selectedCourseId = _courses[0].Id;
                 _selectedYear = _courses[0].Year;
             }
         }
+        catch
+        {
+            _pageError = "Не удалось связаться с сервером. Проверьте подключение и повторите запрос.";
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
 
-        _isLoading = false;
-        StateHasChanged();
-
-        if (_isAuthenticated && _selectedCourseId != Guid.Empty)
+        if (_isAuthenticated && _pageError == null && _selectedCourseId != Guid.Empty)
             await LoadGraphAsync(false);
     }
 
@@ -156,6 +193,10 @@ else
                 jsFunc, _graphElementId, _selectedCourseId, _selectedYear);
             _graphError = string.IsNullOrWhiteSpace(error) ? null : error;
         }
+        catch
+        {
+            _graphError = "Не удалось загрузить граф достижений. Повторите запрос.";
+        }
         finally
         {
             _graphLoading = false;
@@ -177,5 +218,20 @@ else
         public string Title { get; set; } = "";
         public string Description { get; set; } = "";
         public int Year { get; set; }
+    }
+
+    private sealed class SessionResult
+    {
+        public bool Success { get; set; }
+        public int Status { get; set; }
+        public string? Message { get; set; }
+    }
+
+    private sealed class CoursesResult
+    {
+        public bool Success { get; set; }
+        public int Status { get; set; }
+        public string? Message { get; set; }
+        public CourseInfo[]? Courses { get; set; }
     }
 }

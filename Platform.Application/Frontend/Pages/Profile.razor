@@ -12,6 +12,13 @@
         <span class="text-muted">Загрузка...</span>
     </div>
 }
+else if (_error != null)
+{
+    <div class="alert alert-danger mt-3">
+        @_error
+        <button class="btn btn-outline-danger btn-sm ms-2" @onclick="LoadProfileAsync">Повторить</button>
+    </div>
+}
 else if (_student == null)
 {
     <div class="alert alert-warning mt-3">
@@ -46,14 +53,38 @@ else
 @code {
     private bool _isLoading = true;
     private StudentInfo? _student;
+    private string? _error;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
 
-        _student = await JsRuntime.InvokeAsync<StudentInfo?>("platformApi.getCurrentStudent");
-        _isLoading = false;
+        await LoadProfileAsync();
+    }
+
+    private async Task LoadProfileAsync()
+    {
+        _isLoading = true;
+        _error = null;
         StateHasChanged();
+
+        try
+        {
+            var result = await JsRuntime.InvokeAsync<SessionResult>("platformApi.getCurrentStudent");
+            _student = result.Success ? result.Student : null;
+            _error = result.Success || result.Status == 401
+                ? null
+                : result.Message ?? "Не удалось загрузить профиль.";
+        }
+        catch
+        {
+            _error = "Не удалось связаться с сервером. Проверьте подключение и повторите запрос.";
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
     }
 
     private sealed class StudentInfo
@@ -61,5 +92,13 @@ else
         public Guid Id { get; set; }
         public string FullName { get; set; } = "";
         public string Group { get; set; } = "";
+    }
+
+    private sealed class SessionResult
+    {
+        public bool Success { get; set; }
+        public int Status { get; set; }
+        public string? Message { get; set; }
+        public StudentInfo? Student { get; set; }
     }
 }

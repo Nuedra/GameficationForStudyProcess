@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (.NET)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      DOTNET_NOLOGO: true
+      NUGET_XMLDOC_MODE: skip
+
+    steps:
+      - name: Получить исходный код
+        uses: actions/checkout@v7
+
+      - name: Установить .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.407
+
+      - name: Восстановить NuGet-зависимости
+        run: dotnet restore Platform.sln
+
+      - name: Собрать решение
+        run: dotnet build Platform.sln --configuration Release --no-restore
+
+      - name: Запустить тесты
+        run: dotnet test Platform.sln --configuration Release --no-build --verbosity normal
+
+  graph-component:
+    name: Graph component (Node.js)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Получить исходный код
+        uses: actions/checkout@v7
+
+      - name: Установить Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Graph.Component/package-lock.json
+
+      - name: Установить npm-зависимости
+        run: npm ci --prefix Graph.Component
+
+      - name: Собрать компонент
+        run: npm --prefix Graph.Component run build
+
+      - name: Запустить тесты компонента
+        run: npm --prefix Graph.Component test

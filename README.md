@@ -20,61 +20,77 @@ dotnet restore "Platform.sln"
 dotnet build "Platform.sln"
 ```
 
-## Запуск проекта
+## Быстрый локальный запуск
 
-Запуск из корня репозитория:
-
-```bash
-dotnet run --project "Platform.Application/Platform.Application.csproj"
-```
-
-После старта приложение доступно по адресу:
-
-- `http://localhost:5284`, если порт 5284 свободен
-
-## Локальная PostgreSQL для миграций
-
-Для воспроизводимого локального окружения используется `docker-compose`.
-
-1. Создайте локальный env-файл:
+Для работы нужны Docker с Compose и .NET SDK 8.0. Из корня репозитория выполните:
 
 ```bash
 cp ".env.example" ".env"
+./scripts/local-setup.sh
+./scripts/local-run.sh
 ```
 
-Если на macOS уже установлен локальный PostgreSQL, он может занимать
-`localhost:5432`. Проверить это можно так:
+`local-setup.sh` ожидает готовности PostgreSQL, применяет миграции и загружает
+демонстрационные данные студенческого API. `local-run.sh` запускает приложение
+с теми же параметрами подключения. После старта приложение доступно по адресу
+`http://localhost:5284`, а Swagger — по адресу `http://localhost:5284/swagger`.
+
+Скрипт запуска использует HTTP-профиль разработки и намеренно не перенаправляет
+на HTTPS: это исключает предупреждение о не определённом HTTPS-порте. Для
+проверки HTTPS локально выполните `dotnet dev-certs https --trust`, затем:
 
 ```bash
-lsof -nP -iTCP:5432 -sTCP:LISTEN
+source scripts/local-env.sh
+dotnet run --project "Platform.Application/Platform.Application.csproj" --launch-profile https
 ```
 
-Если в выводе есть процесс `postgres`, поменяйте в `.env` порт контейнера на
-`POSTGRES_PORT=5433` и дальше используйте `Port=5433` в
-`PLATFORM_DB_CONNECTION`. Иначе `dotnet ef` может применить миграции в локальную
-PostgreSQL, а seed через `docker exec` будет выполняться в пустую Docker-БД.
+HTTPS-профиль доступен на `https://localhost:7075` и перенаправляет запросы с
+`http://localhost:5284`. В production редирект остаётся включённым и использует
+стандартный HTTPS-порт `443`.
 
-2. Поднимите PostgreSQL:
+По умолчанию Docker PostgreSQL публикуется на `localhost:5433`. Это исключает
+неявное подключение к локальному PostgreSQL, который часто уже занимает `5432`.
+При необходимости порт можно изменить только в `.env`: скрипты автоматически
+сформируют для приложения и EF Core одинаковую переменную
+`ConnectionStrings__Platform`.
+
+Проверить готовность приложения и базы данных можно так:
 
 ```bash
-docker compose up -d
+curl http://localhost:5284/health/ready
 ```
 
-3. Проверьте, что контейнер запущен:
+Ожидаемый ответ:
 
-```bash
-docker compose ps
+```json
+{
+  "status": "ready"
+}
 ```
 
-4. Подготовьте переменную подключения для `dotnet ef`:
+### Автоматическая smoke-проверка
+
+Одна команда подготавливает Docker PostgreSQL, применяет миграции и seed,
+запускает приложение, проверяет аутентификацию, курсы, граф достижений,
+обновление графа, logout и основные отрицательные ответы API. В конце она
+запускает Vitest-проверки Vue-компонента, которые подтверждают передачу XML в
+компонент графа.
 
 ```bash
-export PLATFORM_DB_CONNECTION="Host=localhost;Port=5432;Database=platform;Username=postgres;Password=pass"
+./scripts/smoke-test.sh
 ```
 
-5. Примените миграции:
+Сценарий использует только демонстрационные данные. Он запускает временный
+экземпляр приложения и после завершения автоматически его останавливает.
+
+### Ручная работа с миграциями
+
+Если требуется запускать EF Core вручную, сначала загрузите настройки текущей
+локальной базы. Нельзя использовать прежнюю переменную `PLATFORM_DB_CONNECTION`:
+приложение и EF Core используют только `ConnectionStrings__Platform`.
 
 ```bash
+source scripts/local-env.sh
 dotnet ef database update \
   --project "Platform.DataAccess.Postgress/Platform.DataAccess.Postgress.csproj" \
   --startup-project "Platform.DataAccess.Postgress/Platform.DataAccess.Postgress.csproj"
@@ -147,105 +163,14 @@ docker exec -i nir-platform-postgres psql -U postgres -d platform -c '\d "course
 В таблице `courses` должна быть колонка `ContentScopeID`.
 
 Если это полностью локальная тестовая база и данные в ней не нужны, можно
-пересоздать контейнер и volume, а затем заново выполнить миграции и seed:
+пересоздать контейнер и volume, а затем повторить подготовку:
 
 ```bash
 docker compose down -v
-docker compose up -d
-export PLATFORM_DB_CONNECTION="Host=localhost;Port=5432;Database=platform;Username=postgres;Password=pass"
-dotnet ef database update \
-  --project "Platform.DataAccess.Postgress/Platform.DataAccess.Postgress.csproj" \
-  --startup-project "Platform.DataAccess.Postgress/Platform.DataAccess.Postgress.csproj"
-docker exec -i nir-platform-postgres psql -v ON_ERROR_STOP=1 -U postgres -d platform < "scripts/sql/03_seed_student_api.sql"
+./scripts/local-setup.sh
 ```
 
-## Проверка генерации XML-графа достижений
-
-XML-граф строится из шаблона:
-
-```text
-Platform.Application/Templates/achievement-graph.xml
-```
-
-В тестовом seed-файле ID первых достижений синхронизированы с атрибутами
-`AchivementId` в этом шаблоне, поэтому можно проверить реальные статусы нод.
-
-1. Поднимите PostgreSQL и примените миграции, как описано выше.
-
-2. Загрузите seed для студенческого API:
-
-```bash
-docker exec -i nir-platform-postgres psql -v ON_ERROR_STOP=1 -U postgres -d platform < "scripts/sql/03_seed_student_api.sql"
-```
-
-3. Запустите приложение:
-
-```bash
-dotnet run --project "Platform.Application/Platform.Application.csproj" --launch-profile http
-```
-
-4. Выполните вход студентом и сохраните cookie:
-
-```bash
-curl -c cookies.txt \
-  -H "Content-Type: application/json" \
-  -d '{"id":"b0000000-0000-0000-0000-000000000001"}' \
-  http://localhost:5284/api/auth/student/login
-```
-
-5. Запросите XML-граф по первому курсу:
-
-```bash
-curl -b cookies.txt \
-  -H "Accept: application/xml" \
-  http://localhost:5284/api/student/courses/a1000000-0000-0000-0000-000000000001/2026/achievements/graph \
-  -o graph-result.xml
-```
-
-6. Откройте полученный файл:
-
-```bash
-open graph-result.xml
-```
-
-Для студента `b0000000-0000-0000-0000-000000000001` по первому курсу ожидаются
-такие статусы:
-
-- `AchivementId="00000000-0000-0000-0000-000000000001"`: `earned`;
-- `AchivementId="00000000-0000-0000-0000-000000000002"`: `earned`;
-- `AchivementId="00000000-0000-0000-0000-000000000003"`: `available`;
-- первые ноды веток после `00000000-0000-0000-0000-000000000001`
-  тоже `available`: `00000000-0000-0000-0000-000000000005`,
-  `00000000-0000-0000-0000-000000000008`,
-  `00000000-0000-0000-0000-000000000012`,
-  `00000000-0000-0000-0000-000000000016`,
-  `00000000-0000-0000-0000-000000000020`,
-  `00000000-0000-0000-0000-000000000024`,
-  `00000000-0000-0000-0000-000000000028`,
-  `00000000-0000-0000-0000-000000000032`,
-  `00000000-0000-0000-0000-000000000036`,
-  `00000000-0000-0000-0000-000000000048`;
-- более дальние ноды веток остаются `locked`, пока не получена предыдущая
-  ачивка в соответствующей цепочке.
-
-Для студента `b0000000-0000-0000-0000-000000000002` по первому курсу ожидается:
-
-- `AchivementId="00000000-0000-0000-0000-000000000001"`: `earned`;
-- `AchivementId="00000000-0000-0000-0000-000000000002"` и первые ноды
-  остальных веток после `00000000-0000-0000-0000-000000000001`: `available`;
-- `AchivementId="00000000-0000-0000-0000-000000000003"` и более дальние
-  ноды веток: `locked`.
-
-Проверить XML можно также через Swagger:
-
-```text
-http://localhost:5284/swagger
-```
-
-Сначала выполните `POST /api/auth/student/login`, затем
-`GET /api/student/courses/{courseId}/{year}/achievements/graph`.
-
-## Проверка отрисовки XML-графа на странице приложения
+## Проверка графа достижений в приложении
 
 В `Platform.Application` добавлена минимальная страница без отдельного
 оформления фронта: она берёт XML из API и передаёт его в canvas-компонент
@@ -254,18 +179,13 @@ http://localhost:5284/swagger
 1. Поднимите PostgreSQL, примените миграции и загрузите seed:
 
 ```bash
-docker compose up -d
-export PLATFORM_DB_CONNECTION="Host=localhost;Port=5433;Database=platform;Username=postgres;Password=pass"
-dotnet ef database update \
-  --project "Platform.DataAccess.Postgress/Platform.DataAccess.Postgress.csproj" \
-  --startup-project "Platform.DataAccess.Postgress/Platform.DataAccess.Postgress.csproj"
-docker exec -i nir-platform-postgres psql -v ON_ERROR_STOP=1 -U postgres -d platform < "scripts/sql/03_seed_student_api.sql"
+./scripts/local-setup.sh
 ```
 
 2. Запустите приложение:
 
 ```bash
-dotnet run --project "Platform.Application/Platform.Application.csproj" --launch-profile http
+./scripts/local-run.sh
 ```
 
 3. Откройте Swagger в том же браузере, в котором будете смотреть граф:
@@ -298,6 +218,11 @@ http://localhost:5284/student/courses/a1000000-0000-0000-0000-000000000001/2026/
 
 6. Нажмите кнопку `Отрисовать граф`.
 
+Для тестового студента до обновления достижение «Полпути пройдено!» имеет
+статус `available`. После нажатия «Обновить граф» оно получает статус `earned`:
+демонстрационная ведомость содержит тег, соответствующий его критерию. Повторное
+нажатие не создаёт дубликат достижения.
+
 Страница вызывает:
 
 ```text
@@ -311,3 +236,37 @@ API возвращает XML из шаблона `Platform.Application/Templates
 Если страница показывает сообщение `Сначала выполните вход студентом`, значит
 cookie была создана не в этом браузере или срок сессии истёк. Повторите вход
 через Swagger и обновите страницу графа.
+
+## Автоматическая проверка в GitHub Actions
+
+Workflow `.github/workflows/ci.yml` запускается при каждом `push` и для каждого
+pull request. Два независимых задания проверяют серверную и клиентскую части:
+
+- `Backend (.NET)` восстанавливает NuGet-зависимости, собирает `Platform.sln` в
+  конфигурации `Release` и запускает все тесты .NET;
+- `Graph component (Node.js)` устанавливает зависимости строго по
+  `package-lock.json`, собирает `Graph.Component` и запускает Vitest.
+
+Перед merge оба задания должны завершиться успешно. Локально эквивалентные
+проверки можно выполнить командами:
+
+```bash
+dotnet restore Platform.sln
+dotnet build Platform.sln --configuration Release --no-restore
+dotnet test Platform.sln --configuration Release --no-build
+
+npm ci --prefix Graph.Component
+npm --prefix Graph.Component run build
+npm --prefix Graph.Component test
+```
+
+Полный сценарий с PostgreSQL остаётся отдельной локальной проверкой:
+
+```bash
+./scripts/smoke-test.sh
+```
+
+Базовый CI не публикует приложение и не использует секреты. После добавления
+workflow в основную ветку рекомендуется включить в настройках GitHub защиту
+ветки `main` и сделать проверки `Backend (.NET)` и
+`Graph component (Node.js)` обязательными перед merge.

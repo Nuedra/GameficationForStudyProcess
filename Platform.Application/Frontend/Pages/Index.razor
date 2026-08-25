@@ -68,8 +68,20 @@
     {
         if (!firstRender) return;
 
-        var student = await JsRuntime.InvokeAsync<object?>("platformApi.getCurrentStudent");
-        _isAuthenticated = student != null;
+        try
+        {
+            var session = await JsRuntime.InvokeAsync<SessionResult>("platformApi.getCurrentStudent");
+            _isAuthenticated = session.Success;
+        }
+        catch
+        {
+            _isAuthenticated = false;
+        }
         StateHasChanged();
+    }
+
+    private sealed class SessionResult
+    {
+        public bool Success { get; set; }
     }
 }
