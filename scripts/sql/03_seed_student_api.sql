@@ -339,6 +339,9 @@ FROM seed_template_edges
 ON CONFLICT ("SourceId", "TargetId") DO UPDATE SET
     "Id" = EXCLUDED."Id";
 
+-- Canonical refresh scenario: student b000...001 starts with achievements 1
+-- and 2. The fixed demo appraisal provider returns template_achievement_3,
+-- so POST .../graph/refresh assigns achievement 3 exactly once.
 INSERT INTO "student_achievements"
     ("Id", "AchievementGotDate", "AchievementFoundDate", "IsNotificationSeen",
      "IsFirstAnimationShown", "LabID", "AchievementID", "StudentID")

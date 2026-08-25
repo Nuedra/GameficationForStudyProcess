@@ -13,17 +13,17 @@ namespace Platform.Application.Tests;
 public sealed class StudentApiFactory : WebApplicationFactory<Program>
 {
     public static readonly Guid StudentId =
-        Guid.Parse("11111111-1111-1111-1111-111111111111");
+        Guid.Parse("b0000000-0000-0000-0000-000000000001");
     public static readonly Guid OtherStudentId =
-        Guid.Parse("22222222-2222-2222-2222-222222222222");
+        Guid.Parse("b0000000-0000-0000-0000-000000000002");
     public static readonly Guid CourseId =
-        Guid.Parse("33333333-3333-3333-3333-333333333333");
+        Guid.Parse("a1000000-0000-0000-0000-000000000001");
     public static readonly Guid OtherCourseId =
-        Guid.Parse("44444444-4444-4444-4444-444444444444");
+        Guid.Parse("a1000000-0000-0000-0000-000000000002");
     public static readonly Guid EarnedAchievementId =
-        Guid.Parse("55555555-5555-5555-5555-555555555555");
+        Guid.Parse("00000000-0000-0000-0000-000000000002");
     public static readonly Guid LockedAchievementId =
-        Guid.Parse("66666666-6666-6666-6666-666666666666");
+        Guid.Parse("00000000-0000-0000-0000-000000000003");
 
     private readonly string _databaseName = Guid.NewGuid().ToString();
     private readonly object _databaseLock = new();
@@ -129,7 +129,7 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
         var earnedAchievement = new AchievementEntity
         {
             Id = EarnedAchievementId,
-            Title = "Первая ачивка",
+            Title = "Первый коммит",
             Description = "Полученная ачивка",
             CourseID = CourseId,
             Course = course,
@@ -138,7 +138,7 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
         var lockedAchievement = new AchievementEntity
         {
             Id = LockedAchievementId,
-            Title = "Следующая ачивка",
+            Title = "Полпути пройдено!",
             Description = "Ещё не полученная ачивка",
             CourseID = CourseId,
             Course = course,
@@ -149,7 +149,7 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
             Id = Guid.NewGuid(),
             AchievementID = LockedAchievementId,
             Achievement = lockedAchievement,
-            Expression = "refresh_tag",
+            Expression = "template_achievement_3",
             IsEnabled = true,
             Scope = AchievementCriteriaScope.SameMark
         };
@@ -214,15 +214,15 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
             return Task.FromResult(
                 """
                 <graph>
-                  <node id="earned" AchivementId="55555555-5555-5555-5555-555555555555" label="Первая ачивка">
+                  <node id="earned" AchivementId="00000000-0000-0000-0000-000000000002" label="Первый коммит">
                     <geometry x="0" y="0"/>
                     <status state="locked"/>
                   </node>
-                  <node id="available" AchivementId="66666666-6666-6666-6666-666666666666" label="Следующая ачивка">
+                  <node id="available" AchivementId="00000000-0000-0000-0000-000000000003" label="Полпути пройдено!">
                     <geometry x="1" y="0"/>
                     <status state="locked"/>
                   </node>
-                  <node id="not-from-db" AchivementId="77777777-7777-7777-7777-777777777777" label="Нет в БД">
+                  <node id="not-from-db" AchivementId="00000000-0000-0000-0000-000000000004" label="Нет в БД">
                     <geometry x="2" y="0"/>
                     <status state="earned"/>
                   </node>
@@ -281,7 +281,7 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
                                         0,
                                         0,
                                         TimeSpan.Zero),
-                                    Tags = ["refresh_tag"],
+                                    Tags = ["template_achievement_3"],
                                     Deadline = null,
                                     UploadedAt = null
                                 }

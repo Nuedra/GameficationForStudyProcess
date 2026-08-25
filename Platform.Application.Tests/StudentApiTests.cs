@@ -3,7 +3,10 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Xml.Linq;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Platform.Application.Contracts;
+using Platform.DataAccess.Postgress;
 
 namespace Platform.Application.Tests;
 
@@ -138,6 +141,19 @@ public sealed class StudentApiTests(StudentApiFactory factory)
 
         Assert.Equal("earned", GetNodeStatus(document, "available"));
         Assert.Equal("earned", GetEdgeStatus(document, "edge-earned-available"));
+
+        var repeatedResponse = await client.PostAsync(
+            $"/api/student/courses/{StudentApiFactory.CourseId}/2026/achievements/graph/refresh",
+            content: null);
+        Assert.Equal(HttpStatusCode.OK, repeatedResponse.StatusCode);
+
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+        var assignedCount = await dbContext.StudentAchievements.CountAsync(item =>
+            item.StudentID == StudentApiFactory.StudentId &&
+            item.AchievementID == StudentApiFactory.LockedAchievementId);
+
+        Assert.Equal(1, assignedCount);
     }
 
     private HttpClient CreateClient()
