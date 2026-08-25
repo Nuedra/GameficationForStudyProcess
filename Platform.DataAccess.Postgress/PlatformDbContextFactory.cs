@@ -7,9 +7,7 @@ namespace Platform.DataAccess.Postgress
     {
         public PlatformDbContext CreateDbContext(string[] args)
         {
-            var connectionString =
-                Environment.GetEnvironmentVariable("PLATFORM_DB_CONNECTION")
-                ?? "Host=localhost;Port=5432;Database=platform;Username=postgres;Password=pass";
+            var connectionString = PlatformDatabaseConnection.RequireFromEnvironment();
 
             var options = new DbContextOptionsBuilder<PlatformDbContext>()
                 .UseNpgsql(connectionString)

@@ -20,61 +20,49 @@ dotnet restore "Platform.sln"
 dotnet build "Platform.sln"
 ```
 
-## Запуск проекта
+## Быстрый локальный запуск
 
-Запуск из корня репозитория:
-
-```bash
-dotnet run --project "Platform.Application/Platform.Application.csproj"
-```
-
-После старта приложение доступно по адресу:
-
-- `http://localhost:5284`, если порт 5284 свободен
-
-## Локальная PostgreSQL для миграций
-
-Для воспроизводимого локального окружения используется `docker-compose`.
-
-1. Создайте локальный env-файл:
+Для работы нужны Docker с Compose и .NET SDK 8.0. Из корня репозитория выполните:
 
 ```bash
 cp ".env.example" ".env"
+./scripts/local-setup.sh
+./scripts/local-run.sh
 ```
 
-Если на macOS уже установлен локальный PostgreSQL, он может занимать
-`localhost:5432`. Проверить это можно так:
+`local-setup.sh` ожидает готовности PostgreSQL, применяет миграции и загружает
+демонстрационные данные студенческого API. `local-run.sh` запускает приложение
+с теми же параметрами подключения. После старта приложение доступно по адресу
+`http://localhost:5284`, а Swagger — по адресу `http://localhost:5284/swagger`.
+
+По умолчанию Docker PostgreSQL публикуется на `localhost:5433`. Это исключает
+неявное подключение к локальному PostgreSQL, который часто уже занимает `5432`.
+При необходимости порт можно изменить только в `.env`: скрипты автоматически
+сформируют для приложения и EF Core одинаковую переменную
+`ConnectionStrings__Platform`.
+
+Проверить готовность приложения и базы данных можно так:
 
 ```bash
-lsof -nP -iTCP:5432 -sTCP:LISTEN
+curl http://localhost:5284/health/ready
 ```
 
-Если в выводе есть процесс `postgres`, поменяйте в `.env` порт контейнера на
-`POSTGRES_PORT=5433` и дальше используйте `Port=5433` в
-`PLATFORM_DB_CONNECTION`. Иначе `dotnet ef` может применить миграции в локальную
-PostgreSQL, а seed через `docker exec` будет выполняться в пустую Docker-БД.
+Ожидаемый ответ:
 
-2. Поднимите PostgreSQL:
-
-```bash
-docker compose up -d
+```json
+{
+  "status": "ready"
+}
 ```
 
-3. Проверьте, что контейнер запущен:
+### Ручная работа с миграциями
+
+Если требуется запускать EF Core вручную, сначала загрузите настройки текущей
+локальной базы. Нельзя использовать прежнюю переменную `PLATFORM_DB_CONNECTION`:
+приложение и EF Core используют только `ConnectionStrings__Platform`.
 
 ```bash
-docker compose ps
-```
-
-4. Подготовьте переменную подключения для `dotnet ef`:
-
-```bash
-export PLATFORM_DB_CONNECTION="Host=localhost;Port=5432;Database=platform;Username=postgres;Password=pass"
-```
-
-5. Примените миграции:
-
-```bash
+source scripts/local-env.sh
 dotnet ef database update \
   --project "Platform.DataAccess.Postgress/Platform.DataAccess.Postgress.csproj" \
   --startup-project "Platform.DataAccess.Postgress/Platform.DataAccess.Postgress.csproj"
@@ -147,16 +135,11 @@ docker exec -i nir-platform-postgres psql -U postgres -d platform -c '\d "course
 В таблице `courses` должна быть колонка `ContentScopeID`.
 
 Если это полностью локальная тестовая база и данные в ней не нужны, можно
-пересоздать контейнер и volume, а затем заново выполнить миграции и seed:
+пересоздать контейнер и volume, а затем повторить подготовку:
 
 ```bash
 docker compose down -v
-docker compose up -d
-export PLATFORM_DB_CONNECTION="Host=localhost;Port=5432;Database=platform;Username=postgres;Password=pass"
-dotnet ef database update \
-  --project "Platform.DataAccess.Postgress/Platform.DataAccess.Postgress.csproj" \
-  --startup-project "Platform.DataAccess.Postgress/Platform.DataAccess.Postgress.csproj"
-docker exec -i nir-platform-postgres psql -v ON_ERROR_STOP=1 -U postgres -d platform < "scripts/sql/03_seed_student_api.sql"
+./scripts/local-setup.sh
 ```
 
 ## Проверка генерации XML-графа достижений
@@ -181,7 +164,7 @@ docker exec -i nir-platform-postgres psql -v ON_ERROR_STOP=1 -U postgres -d plat
 3. Запустите приложение:
 
 ```bash
-dotnet run --project "Platform.Application/Platform.Application.csproj" --launch-profile http
+./scripts/local-run.sh
 ```
 
 4. Выполните вход студентом и сохраните cookie:
@@ -254,18 +237,13 @@ http://localhost:5284/swagger
 1. Поднимите PostgreSQL, примените миграции и загрузите seed:
 
 ```bash
-docker compose up -d
-export PLATFORM_DB_CONNECTION="Host=localhost;Port=5433;Database=platform;Username=postgres;Password=pass"
-dotnet ef database update \
-  --project "Platform.DataAccess.Postgress/Platform.DataAccess.Postgress.csproj" \
-  --startup-project "Platform.DataAccess.Postgress/Platform.DataAccess.Postgress.csproj"
-docker exec -i nir-platform-postgres psql -v ON_ERROR_STOP=1 -U postgres -d platform < "scripts/sql/03_seed_student_api.sql"
+./scripts/local-setup.sh
 ```
 
 2. Запустите приложение:
 
 ```bash
-dotnet run --project "Platform.Application/Platform.Application.csproj" --launch-profile http
+./scripts/local-run.sh
 ```
 
 3. Откройте Swagger в том же браузере, в котором будете смотреть граф:

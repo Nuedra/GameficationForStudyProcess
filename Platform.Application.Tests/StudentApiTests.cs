@@ -13,6 +13,18 @@ public sealed class StudentApiTests(StudentApiFactory factory)
     private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
 
     [Fact]
+    public async Task HealthReady_AvailableDatabase_ReturnsReady()
+    {
+        using var client = CreateClient();
+
+        var response = await client.GetAsync("/health/ready");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("ready", document.RootElement.GetProperty("status").GetString());
+    }
+
+    [Fact]
     public async Task Login_ExistingStudent_ReturnsStudentAndPersistentCookie()
     {
         using var client = CreateClient();

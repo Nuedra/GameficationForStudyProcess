@@ -9,9 +9,7 @@ public sealed class ListDbConnection
     private readonly string _connectionString;
 
     public ListDbConnection()
-        : this(
-            Environment.GetEnvironmentVariable("PLATFORM_DB_CONNECTION")
-            ?? "Host=localhost;Port=5432;Database=platform;Username=postgres;Password=pass")
+        : this(PlatformDatabaseConnection.RequireFromEnvironment())
     {
     }
 

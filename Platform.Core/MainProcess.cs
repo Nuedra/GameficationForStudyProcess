@@ -11,8 +11,7 @@ namespace Platform.Core
     {
         public static async Task MainProcess(Guid studentId)
         {
-            string connectionString =
-                "Host=localhost;Port=5432;Database=platform;Username=postgres;Password=pass";
+            var connectionString = PlatformDatabaseConnection.RequireFromEnvironment();
 
             await using var db = PlatformDatabase.Connect(connectionString);
 

@@ -14,6 +14,9 @@ using Platform.DataAccess.Postgress;
 
 var builder = WebApplication.CreateBuilder(args);
 
+string GetConnectionString() => PlatformDatabaseConnection.Require(
+    builder.Configuration.GetConnectionString(PlatformDatabaseConnection.ConnectionStringName));
+
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddEndpointsApiExplorer();
@@ -72,9 +75,7 @@ builder.Services
 builder.Services.AddAuthorization();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddDbContext<PlatformDbContext>(options =>
-    options.UseNpgsql(
-        Environment.GetEnvironmentVariable("PLATFORM_DB_CONNECTION")
-        ?? "Host=localhost;Port=5432;Database=platform;Username=postgres;Password=pass"));
+    options.UseNpgsql(GetConnectionString()));
 builder.Services.AddScoped<IUserContextService, UserContextService>();
 builder.Services.AddScoped<IStudentIdentityService, StudentIdentityService>();
 builder.Services.AddScoped<IStudentCourseService, StudentCourseService>();
@@ -85,8 +86,7 @@ builder.Services.AddSingleton<IAppraisalPayloadParser, AppraisalPayloadParser>()
 builder.Services.AddSingleton<IAppraisalFactsExtractor, AppraisalFactsExtractor>();
 builder.Services.AddSingleton<IAppraisalPayloadProvider, FixedAppraisalPayloadProvider>();
 builder.Services.AddScoped(serviceProvider => new AchievementProcessingCycle(
-    Environment.GetEnvironmentVariable("PLATFORM_DB_CONNECTION")
-        ?? "Host=localhost;Port=5432;Database=platform;Username=postgres;Password=pass",
+    GetConnectionString(),
     serviceProvider.GetRequiredService<IAppraisalPayloadProvider>(),
     serviceProvider.GetRequiredService<IAppraisalFactsExtractor>()));
 
@@ -108,6 +108,27 @@ app.UseStaticFiles();
 app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.MapGet("/health/ready", async (
+    PlatformDbContext dbContext,
+    ILogger<Program> logger,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        if (await dbContext.Database.CanConnectAsync(cancellationToken))
+            return Results.Ok(new { status = "ready" });
+    }
+    catch (Exception exception)
+    {
+        logger.LogWarning(exception, "Database readiness check failed.");
+    }
+
+    return Results.Problem(
+        title: "Database is unavailable",
+        detail: "Start the local database with scripts/local-setup.sh and verify the connection settings in .env.",
+        statusCode: StatusCodes.Status503ServiceUnavailable);
+}).AllowAnonymous();
 
 app.MapControllers();
 app.MapBlazorHub();
