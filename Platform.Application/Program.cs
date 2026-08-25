@@ -17,6 +17,15 @@ var builder = WebApplication.CreateBuilder(args);
 string GetConnectionString() => PlatformDatabaseConnection.Require(
     builder.Configuration.GetConnectionString(PlatformDatabaseConnection.ConnectionStringName));
 
+var enableHttpsRedirection = !builder.Environment.IsDevelopment() ||
+    builder.Configuration.GetValue<bool>("HttpsRedirection:Enabled");
+var httpsPort = builder.Configuration.GetValue<int?>("HttpsRedirection:HttpsPort");
+
+if (enableHttpsRedirection && httpsPort.HasValue)
+{
+    builder.Services.AddHttpsRedirection(options => options.HttpsPort = httpsPort.Value);
+}
+
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddEndpointsApiExplorer();
@@ -103,7 +112,8 @@ else
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+if (enableHttpsRedirection)
+    app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
 app.UseAuthentication();

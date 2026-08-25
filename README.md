@@ -35,6 +35,19 @@ cp ".env.example" ".env"
 с теми же параметрами подключения. После старта приложение доступно по адресу
 `http://localhost:5284`, а Swagger — по адресу `http://localhost:5284/swagger`.
 
+Скрипт запуска использует HTTP-профиль разработки и намеренно не перенаправляет
+на HTTPS: это исключает предупреждение о не определённом HTTPS-порте. Для
+проверки HTTPS локально выполните `dotnet dev-certs https --trust`, затем:
+
+```bash
+source scripts/local-env.sh
+dotnet run --project "Platform.Application/Platform.Application.csproj" --launch-profile https
+```
+
+HTTPS-профиль доступен на `https://localhost:7075` и перенаправляет запросы с
+`http://localhost:5284`. В production редирект остаётся включённым и использует
+стандартный HTTPS-порт `443`.
+
 По умолчанию Docker PostgreSQL публикуется на `localhost:5433`. Это исключает
 неявное подключение к локальному PostgreSQL, который часто уже занимает `5432`.
 При необходимости порт можно изменить только в `.env`: скрипты автоматически
