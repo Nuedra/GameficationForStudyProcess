@@ -236,3 +236,37 @@ API возвращает XML из шаблона `Platform.Application/Templates
 Если страница показывает сообщение `Сначала выполните вход студентом`, значит
 cookie была создана не в этом браузере или срок сессии истёк. Повторите вход
 через Swagger и обновите страницу графа.
+
+## Автоматическая проверка в GitHub Actions
+
+Workflow `.github/workflows/ci.yml` запускается при каждом `push` и для каждого
+pull request. Два независимых задания проверяют серверную и клиентскую части:
+
+- `Backend (.NET)` восстанавливает NuGet-зависимости, собирает `Platform.sln` в
+  конфигурации `Release` и запускает все тесты .NET;
+- `Graph component (Node.js)` устанавливает зависимости строго по
+  `package-lock.json`, собирает `Graph.Component` и запускает Vitest.
+
+Перед merge оба задания должны завершиться успешно. Локально эквивалентные
+проверки можно выполнить командами:
+
+```bash
+dotnet restore Platform.sln
+dotnet build Platform.sln --configuration Release --no-restore
+dotnet test Platform.sln --configuration Release --no-build
+
+npm ci --prefix Graph.Component
+npm --prefix Graph.Component run build
+npm --prefix Graph.Component test
+```
+
+Полный сценарий с PostgreSQL остаётся отдельной локальной проверкой:
+
+```bash
+./scripts/smoke-test.sh
+```
+
+Базовый CI не публикует приложение и не использует секреты. После добавления
+workflow в основную ветку рекомендуется включить в настройках GitHub защиту
+ветки `main` и сделать проверки `Backend (.NET)` и
+`Graph component (Node.js)` обязательными перед merge.
