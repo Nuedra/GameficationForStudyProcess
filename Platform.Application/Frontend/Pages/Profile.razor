@@ -1,4 +1,5 @@
 @page "/profile"
+@attribute [Authorize(Roles = "student")]
 @inject IJSRuntime JsRuntime
 
 <PageTitle>Профиль студента — Платформа достижений</PageTitle>
@@ -35,7 +36,7 @@ else
                     <span class="oi oi-person" aria-hidden="true"></span>
                 </div>
                 <div>
-                    <h4 class="mb-0">@_student.FullName</h4>
+                    <h4 class="mb-0">@_student.DisplayName</h4>
                     <p class="text-muted mb-0">@_student.Group</p>
                 </div>
             </div>
@@ -70,8 +71,8 @@ else
 
         try
         {
-            var result = await JsRuntime.InvokeAsync<SessionResult>("platformApi.getCurrentStudent");
-            _student = result.Success ? result.Student : null;
+            var result = await JsRuntime.InvokeAsync<SessionResult>("platformApi.getCurrentUser");
+            _student = result.Success ? result.User : null;
             _error = result.Success || result.Status == 401
                 ? null
                 : result.Message ?? "Не удалось загрузить профиль.";
@@ -90,7 +91,7 @@ else
     private sealed class StudentInfo
     {
         public Guid Id { get; set; }
-        public string FullName { get; set; } = "";
+        public string DisplayName { get; set; } = "";
         public string Group { get; set; } = "";
     }
 
@@ -99,6 +100,6 @@ else
         public bool Success { get; set; }
         public int Status { get; set; }
         public string? Message { get; set; }
-        public StudentInfo? Student { get; set; }
+        public StudentInfo? User { get; set; }
     }
 }

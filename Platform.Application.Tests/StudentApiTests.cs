@@ -6,6 +6,7 @@ using System.Xml.Linq;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Platform.Application.Contracts;
+using Platform.Core.Models;
 using Platform.DataAccess.Postgress;
 
 namespace Platform.Application.Tests;
@@ -28,20 +29,38 @@ public sealed class StudentApiTests(StudentApiFactory factory)
     }
 
     [Fact]
-    public async Task Login_ExistingStudent_ReturnsStudentAndPersistentCookie()
+    public async Task Login_ExistingStudent_ReturnsStudentRoleAndSessionCookie()
     {
         using var client = CreateClient();
 
         var response = await Login(client, StudentApiFactory.StudentId);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var student = await response.Content.ReadFromJsonAsync<StudentDto>(JsonOptions);
-        Assert.Equal(StudentApiFactory.StudentId, student!.Id);
+        var user = await response.Content.ReadFromJsonAsync<AuthenticatedUserDto>(JsonOptions);
+        Assert.Equal(StudentApiFactory.StudentId, user!.Id);
+        Assert.Equal(UserRole.Student, user.Role);
         Assert.Contains(
             response.Headers.GetValues("Set-Cookie"),
             value =>
-                value.Contains("Platform.Student=", StringComparison.Ordinal) &&
-                value.Contains("expires=", StringComparison.OrdinalIgnoreCase));
+                value.Contains("Platform.Auth=", StringComparison.Ordinal) &&
+                !value.Contains("expires=", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Theory]
+    [InlineData("b1000000-0000-0000-0000-000000000001", UserRole.Teacher)]
+    [InlineData("b2000000-0000-0000-0000-000000000001", UserRole.Administrator)]
+    public async Task Login_ConfiguredPrivilegedUser_ReturnsServerAssignedRole(
+        string userId,
+        UserRole expectedRole)
+    {
+        using var client = CreateClient();
+
+        var response = await Login(client, Guid.Parse(userId));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var user = await response.Content.ReadFromJsonAsync<AuthenticatedUserDto>(JsonOptions);
+        Assert.Equal(expectedRole, user!.Role);
+        Assert.Null(user.Group);
     }
 
     [Fact]
@@ -65,8 +84,65 @@ public sealed class StudentApiTests(StudentApiFactory factory)
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var error = await response.Content.ReadFromJsonAsync<ApiErrorDto>(JsonOptions);
-        Assert.Equal("invalid_student_id", error!.Code);
+        Assert.Equal("invalid_user_id", error!.Code);
         Assert.NotEmpty(error.Message);
+    }
+
+    [Fact]
+    public async Task Login_WithoutAntiforgeryToken_ReturnsBadRequest()
+    {
+        using var client = CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            "/api/auth/login",
+            new GuidLoginRequest(StudentApiFactory.StudentId),
+            JsonOptions);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task StudentEndpoint_TeacherRole_ReturnsForbidden()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.TeacherId);
+
+        var response = await client.GetAsync("/api/student/courses");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ApiErrorDto>(JsonOptions);
+        Assert.Equal("access_denied", error!.Code);
+    }
+
+    [Fact]
+    public async Task Session_AuthenticatedUser_ReturnsLifecycleMetadata()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.AdministratorId);
+
+        var session = await client.GetFromJsonAsync<AuthenticatedSessionDto>(
+            "/api/auth/session",
+            JsonOptions);
+
+        Assert.Equal(StudentApiFactory.AdministratorId, session!.User.Id);
+        Assert.Equal(UserRole.Administrator, session.User.Role);
+        Assert.NotEqual(Guid.Empty, session.SessionId);
+        Assert.NotNull(session.IssuedUtc);
+        Assert.NotNull(session.ExpiresUtc);
+        Assert.True(session.ExpiresUtc > session.IssuedUtc);
+    }
+
+    [Fact]
+    public async Task Logout_WithAntiforgeryToken_InvalidatesServerSession()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.StudentId);
+
+        var logout = await client.PostAsync("/api/auth/logout", content: null);
+        var me = await client.GetAsync("/api/auth/me");
+
+        Assert.Equal(HttpStatusCode.NoContent, logout.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, me.StatusCode);
     }
 
     [Fact]
@@ -135,6 +211,7 @@ public sealed class StudentApiTests(StudentApiFactory factory)
     public async Task AchievementGraphRefresh_WithoutAuthentication_ReturnsUnauthorizedJson()
     {
         using var client = CreateClient();
+        await SetCsrfToken(client);
 
         var response = await client.PostAsync(
             $"/api/student/courses/{StudentApiFactory.CourseId}/2026/achievements/graph/refresh",
@@ -196,12 +273,25 @@ public sealed class StudentApiTests(StudentApiFactory factory)
         });
     }
 
-    private static Task<HttpResponseMessage> Login(HttpClient client, Guid studentId)
+    private static async Task<HttpResponseMessage> Login(HttpClient client, Guid userId)
     {
-        return client.PostAsJsonAsync(
-            "/api/auth/student/login",
-            new StudentLoginRequest(studentId),
+        await SetCsrfToken(client);
+        var response = await client.PostAsJsonAsync(
+            "/api/auth/login",
+            new GuidLoginRequest(userId),
             JsonOptions);
+        if (response.IsSuccessStatusCode)
+            await SetCsrfToken(client);
+        return response;
+    }
+
+    private static async Task SetCsrfToken(HttpClient client)
+    {
+        var csrf = await client.GetFromJsonAsync<CsrfTokenDto>(
+            "/api/auth/csrf",
+            JsonOptions);
+        client.DefaultRequestHeaders.Remove("X-CSRF-TOKEN");
+        client.DefaultRequestHeaders.Add("X-CSRF-TOKEN", csrf!.Token);
     }
 
     private static JsonSerializerOptions CreateJsonOptions()

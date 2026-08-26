@@ -1,5 +1,6 @@
 @page "/achievement-graph-demo"
 @page "/student/courses/{CourseId:guid}/{Year:int}/achievement-graph"
+@attribute [Authorize(Roles = "student")]
 @inject IJSRuntime JsRuntime
 
 <PageTitle>Граф достижений</PageTitle>

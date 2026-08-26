@@ -1,5 +1,4 @@
 @page "/"
-@inject IJSRuntime JsRuntime
 
 <PageTitle>Главная — Платформа достижений</PageTitle>
 
@@ -48,40 +47,16 @@
 
 <h5 class="mb-3">Как пользоваться</h5>
 <ol class="text-muted">
-    <li class="mb-1">Войдите в систему по своему студенческому ID.</li>
+    <li class="mb-1">Войдите в систему по выданному вам ID пользователя.</li>
     <li class="mb-1">Перейдите во вкладку <strong>Достижения</strong> и выберите курс.</li>
     <li class="mb-1">Изучите граф: зелёные узлы — уже заработанные, жёлтые — доступны сейчас, серые — ещё заблокированы.</li>
     <li>После выполнения заданий нажмите <strong>Обновить граф</strong>, чтобы увидеть новый прогресс.</li>
 </ol>
 
-@if (!_isAuthenticated)
-{
-    <div class="mt-4">
-        <a href="login" class="btn btn-primary px-4">Войти в систему</a>
-    </div>
-}
-
-@code {
-    private bool _isAuthenticated;
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (!firstRender) return;
-
-        try
-        {
-            var session = await JsRuntime.InvokeAsync<SessionResult>("platformApi.getCurrentStudent");
-            _isAuthenticated = session.Success;
-        }
-        catch
-        {
-            _isAuthenticated = false;
-        }
-        StateHasChanged();
-    }
-
-    private sealed class SessionResult
-    {
-        public bool Success { get; set; }
-    }
-}
+<AuthorizeView>
+    <NotAuthorized>
+        <div class="mt-4">
+            <a href="login" class="btn btn-primary px-4">Войти в систему</a>
+        </div>
+    </NotAuthorized>
+</AuthorizeView>

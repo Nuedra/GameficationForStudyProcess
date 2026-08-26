@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Platform.Application.Services;
@@ -16,6 +17,10 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
         Guid.Parse("b0000000-0000-0000-0000-000000000001");
     public static readonly Guid OtherStudentId =
         Guid.Parse("b0000000-0000-0000-0000-000000000002");
+    public static readonly Guid TeacherId =
+        Guid.Parse("b1000000-0000-0000-0000-000000000001");
+    public static readonly Guid AdministratorId =
+        Guid.Parse("b2000000-0000-0000-0000-000000000001");
     public static readonly Guid CourseId =
         Guid.Parse("a1000000-0000-0000-0000-000000000001");
     public static readonly Guid OtherCourseId =
@@ -31,6 +36,18 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
+        builder.ConfigureAppConfiguration((_, configuration) =>
+            configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["GuidAuthentication:PrivilegedUsers:0:Id"] = TeacherId.ToString(),
+                ["GuidAuthentication:PrivilegedUsers:0:DisplayName"] = "Преподаватель Тестовый",
+                ["GuidAuthentication:PrivilegedUsers:0:Role"] = "Teacher",
+                ["GuidAuthentication:PrivilegedUsers:0:IsActive"] = "true",
+                ["GuidAuthentication:PrivilegedUsers:1:Id"] = AdministratorId.ToString(),
+                ["GuidAuthentication:PrivilegedUsers:1:DisplayName"] = "Администратор Тестовый",
+                ["GuidAuthentication:PrivilegedUsers:1:Role"] = "Administrator",
+                ["GuidAuthentication:PrivilegedUsers:1:IsActive"] = "true"
+            }));
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<DbContextOptions<PlatformDbContext>>();

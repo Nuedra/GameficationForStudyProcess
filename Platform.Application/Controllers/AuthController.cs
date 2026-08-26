@@ -1,10 +1,12 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Platform.Application.Authentication;
 using Platform.Application.Contracts;
+using Platform.Application.Models;
 using Platform.Application.Services;
 using Platform.Core.Models;
 
@@ -13,40 +15,71 @@ namespace Platform.Application.Controllers;
 [ApiController]
 [Route("api/auth")]
 [Produces("application/json")]
-public sealed class AuthController(IStudentIdentityService studentIdentityService) : ControllerBase
+public sealed class AuthController(
+    IUserIdentityService userIdentityService,
+    TimeProvider timeProvider,
+    ILogger<AuthController> logger) : ControllerBase
 {
+    [HttpGet("csrf")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(CsrfTokenDto), StatusCodes.Status200OK)]
+    public ActionResult<CsrfTokenDto> GetCsrfToken(
+        [FromServices] IAntiforgery antiforgery)
+    {
+        var tokens = antiforgery.GetAndStoreTokens(HttpContext);
+        return Ok(new CsrfTokenDto(tokens.RequestToken!));
+    }
+
     /// <summary>
-    /// Выполняет вход студента по ID.
+    /// Выполняет вход пользователя по GUID.
     /// </summary>
     /// <remarks>
-    /// Если студент с указанным ID найден, сервер создаёт cookie `Platform.Student`.
-    /// Эту cookie фронт использует в следующих запросах к студенческим endpoints.
+    /// Роль определяется только сервером: студент ищется в БД, а преподаватель и
+    /// администратор — в конфигурации приложения.
     /// </remarks>
-    /// <param name="request">ID студента для входа.</param>
+    /// <param name="request">GUID пользователя для входа.</param>
     /// <param name="cancellationToken">Токен отмены запроса.</param>
-    /// <returns>Данные вошедшего студента.</returns>
-    [HttpPost("student/login")]
+    /// <returns>Данные вошедшего пользователя и назначенная сервером роль.</returns>
+    [HttpPost("login")]
     [AllowAnonymous]
-    [ProducesResponseType(typeof(StudentDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(AuthenticatedUserDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorDto), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiErrorDto), StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<StudentDto>> Login(
-        StudentLoginRequest request,
+    public async Task<ActionResult<AuthenticatedUserDto>> Login(
+        GuidLoginRequest request,
         CancellationToken cancellationToken)
     {
         if (request.Id == Guid.Empty)
-            return BadRequest(ApiErrors.InvalidStudentId);
+        {
+            logger.LogWarning(
+                "GUID login rejected: empty identifier. RemoteIp={RemoteIp}",
+                HttpContext.Connection.RemoteIpAddress);
+            return BadRequest(ApiErrors.InvalidUserId);
+        }
 
-        var student = await studentIdentityService.FindByIdAsync(request.Id, cancellationToken);
-        if (student is null)
+        var user = await userIdentityService.ResolveByIdAsync(request.Id, cancellationToken);
+        if (user is null)
+        {
+            logger.LogWarning(
+                "GUID login rejected. UserIdPrefix={UserIdPrefix}, RemoteIp={RemoteIp}",
+                request.Id.ToString("N")[..8],
+                HttpContext.Connection.RemoteIpAddress);
             return Unauthorized(ApiErrors.InvalidCredentials);
+        }
+
+        var sessionId = Guid.NewGuid();
+        var issuedUtc = timeProvider.GetUtcNow();
+        var expiresUtc = issuedUtc.AddHours(8);
 
         var claims = new[]
         {
-            new Claim(ClaimTypes.NameIdentifier, student.Id.ToString()),
-            new Claim(ClaimTypes.Name, student.FullName),
-            new Claim(ClaimTypes.Role, UserRoleDictionary.Values[UserRole.Student])
-        };
+            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new Claim(ClaimTypes.Name, user.DisplayName),
+            new Claim(ClaimTypes.Role, UserRoleDictionary.Values[user.Role]),
+            new Claim(PlatformClaimTypes.SessionId, sessionId.ToString())
+        }.ToList();
+        if (!string.IsNullOrWhiteSpace(user.Group))
+            claims.Add(new Claim(PlatformClaimTypes.Group, user.Group));
         var identity = new ClaimsIdentity(
             claims,
             CookieAuthenticationDefaults.AuthenticationScheme);
@@ -57,35 +90,60 @@ public sealed class AuthController(IStudentIdentityService studentIdentityServic
             principal,
             new AuthenticationProperties
             {
-                IsPersistent = true
+                IsPersistent = false,
+                IssuedUtc = issuedUtc,
+                ExpiresUtc = expiresUtc
             });
 
-        return Ok(student);
+        logger.LogInformation(
+            "GUID login succeeded. UserId={UserId}, Role={Role}, SessionId={SessionId}, RemoteIp={RemoteIp}",
+            user.Id,
+            UserRoleDictionary.Values[user.Role],
+            sessionId,
+            HttpContext.Connection.RemoteIpAddress);
+
+        return Ok(ToDto(user));
     }
 
     /// <summary>
-    /// Возвращает текущего авторизованного студента.
+    /// Возвращает текущего авторизованного пользователя.
     /// </summary>
     /// <remarks>
     /// Endpoint нужен фронту, чтобы после перезагрузки страницы понять, есть ли активная
-    /// студенческая сессия и кому она принадлежит.
+    /// сессия и кому она принадлежит.
     /// </remarks>
-    /// <param name="cancellationToken">Токен отмены запроса.</param>
-    /// <returns>Данные текущего студента.</returns>
+    /// <returns>Данные текущего пользователя.</returns>
     [HttpGet("me")]
-    [Authorize(Roles = "student")]
-    [ProducesResponseType(typeof(StudentDto), StatusCodes.Status200OK)]
+    [Authorize]
+    [ProducesResponseType(typeof(AuthenticatedUserDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiErrorDto), StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<StudentDto>> GetCurrentStudent(
-        CancellationToken cancellationToken)
+    public ActionResult<AuthenticatedUserDto> GetCurrentUser()
     {
-        if (!User.TryGetUserId(out var studentId))
+        if (!TryBuildCurrentUser(out var user))
             return Unauthorized(ApiErrors.AuthenticationRequired);
 
-        var student = await studentIdentityService.FindByIdAsync(studentId, cancellationToken);
-        return student is null
-            ? Unauthorized(ApiErrors.AuthenticationRequired)
-            : Ok(student);
+        return Ok(user);
+    }
+
+    [HttpGet("session")]
+    [Authorize]
+    [ProducesResponseType(typeof(AuthenticatedSessionDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiErrorDto), StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<AuthenticatedSessionDto>> GetCurrentSession()
+    {
+        if (!TryBuildCurrentUser(out var user) ||
+            !Guid.TryParse(User.FindFirstValue(PlatformClaimTypes.SessionId), out var sessionId))
+        {
+            return Unauthorized(ApiErrors.AuthenticationRequired);
+        }
+
+        var authentication = await HttpContext.AuthenticateAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme);
+        return Ok(new AuthenticatedSessionDto(
+            user,
+            sessionId,
+            authentication.Properties?.IssuedUtc,
+            authentication.Properties?.ExpiresUtc));
     }
 
     /// <summary>
@@ -101,7 +159,42 @@ public sealed class AuthController(IStudentIdentityService studentIdentityServic
     [ProducesResponseType(typeof(ApiErrorDto), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Logout()
     {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var role = User.FindFirstValue(ClaimTypes.Role);
+        var sessionId = User.FindFirstValue(PlatformClaimTypes.SessionId);
         await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        logger.LogInformation(
+            "Authentication session ended. UserId={UserId}, Role={Role}, SessionId={SessionId}, RemoteIp={RemoteIp}",
+            userId,
+            role,
+            sessionId,
+            HttpContext.Connection.RemoteIpAddress);
         return NoContent();
+    }
+
+    private bool TryBuildCurrentUser(out AuthenticatedUserDto user)
+    {
+        if (!User.TryGetUserId(out var userId) ||
+            !User.TryGetUserRole(out var role))
+        {
+            user = null!;
+            return false;
+        }
+
+        user = new AuthenticatedUserDto(
+            userId,
+            User.Identity?.Name ?? string.Empty,
+            role,
+            User.FindFirstValue(PlatformClaimTypes.Group));
+        return true;
+    }
+
+    private static AuthenticatedUserDto ToDto(ResolvedUserIdentity user)
+    {
+        return new AuthenticatedUserDto(
+            user.Id,
+            user.DisplayName,
+            user.Role,
+            user.Group);
     }
 }

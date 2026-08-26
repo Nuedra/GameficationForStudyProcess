@@ -1,8 +1,6 @@
 @inherits LayoutComponentBase
-@implements IDisposable
 @inject IJSRuntime JsRuntime
 @inject NavigationManager Navigation
-@inject IUserContextService UserContextService
 
 <PageTitle>Платформа достижений</PageTitle>
 
@@ -13,19 +11,19 @@
 
     <main>
         <div class="top-row px-4 d-flex align-items-center justify-content-end gap-3">
-            @if (_studentName != null)
-            {
-                <span class="text-muted small">
-                    <span class="oi oi-person me-1" aria-hidden="true"></span>@_studentName
-                </span>
-                <button class="btn btn-sm btn-outline-secondary" @onclick="LogoutAsync">
-                    <span class="oi oi-account-logout me-1" aria-hidden="true"></span>Выйти
-                </button>
-            }
-            else
-            {
-                <a class="btn btn-sm btn-primary" href="login">Войти</a>
-            }
+            <AuthorizeView>
+                <Authorized Context="authenticationState">
+                    <span class="text-muted small">
+                        <span class="oi oi-person me-1" aria-hidden="true"></span>@authenticationState.User.Identity?.Name
+                    </span>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="LogoutAsync">
+                        <span class="oi oi-account-logout me-1" aria-hidden="true"></span>Выйти
+                    </button>
+                </Authorized>
+                <NotAuthorized>
+                    <a class="btn btn-sm btn-primary" href="login">Войти</a>
+                </NotAuthorized>
+            </AuthorizeView>
         </div>
 
         <article class="content px-4">
@@ -35,61 +33,9 @@
 </div>
 
 @code {
-    private string? _studentName;
-
-    protected override void OnInitialized()
-    {
-        UserContextService.OnChanged += HandleUserContextChanged;
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (!firstRender) return;
-        await RefreshStudentNameAsync();
-    }
-
-    private async void HandleUserContextChanged()
-    {
-        await RefreshStudentNameAsync();
-    }
-
-    private async Task RefreshStudentNameAsync()
-    {
-        try
-        {
-            var session = await JsRuntime.InvokeAsync<SessionResult>("platformApi.getCurrentStudent");
-            _studentName = session.Success ? session.Student?.FullName : null;
-        }
-        catch
-        {
-            _studentName = null;
-        }
-        await InvokeAsync(StateHasChanged);
-    }
-
     private async Task LogoutAsync()
     {
         await JsRuntime.InvokeVoidAsync("platformApi.logout");
-        UserContextService.SetCurrentUserId(null);
-        _studentName = null;
         Navigation.NavigateTo("/", forceLoad: true);
-    }
-
-    public void Dispose()
-    {
-        UserContextService.OnChanged -= HandleUserContextChanged;
-    }
-
-    private sealed class StudentInfo
-    {
-        public Guid Id { get; set; }
-        public string FullName { get; set; } = "";
-        public string Group { get; set; } = "";
-    }
-
-    private sealed class SessionResult
-    {
-        public bool Success { get; set; }
-        public StudentInfo? Student { get; set; }
     }
 }
