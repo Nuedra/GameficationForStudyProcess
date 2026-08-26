@@ -8,6 +8,7 @@ using Platform.Application.Services;
 using Platform.Core.Appraisals;
 using Platform.Core.Processing;
 using Platform.DataAccess.Postgress;
+using Platform.Lms;
 
 namespace Platform.Application.Tests;
 
@@ -68,6 +69,7 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
 
                 return new AchievementProcessingCycle(
                     () => new PlatformDbContext(options),
+                    serviceProvider.GetRequiredService<ILmsDataSource>(),
                     serviceProvider.GetRequiredService<IAppraisalPayloadProvider>(),
                     serviceProvider.GetRequiredService<IAppraisalFactsExtractor>(),
                     TimeProvider.System);

@@ -38,7 +38,9 @@ public sealed class StudentApiTests(StudentApiFactory factory)
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var user = await response.Content.ReadFromJsonAsync<AuthenticatedUserDto>(JsonOptions);
         Assert.Equal(StudentApiFactory.StudentId, user!.Id);
+        Assert.Equal("Иванов Иван", user.DisplayName);
         Assert.Equal(UserRole.Student, user.Role);
+        Assert.Equal("ИВТ-101", user.Group);
         Assert.Contains(
             response.Headers.GetValues("Set-Cookie"),
             value =>
@@ -169,6 +171,8 @@ public sealed class StudentApiTests(StudentApiFactory factory)
 
         var course = Assert.Single(courses!);
         Assert.Equal(StudentApiFactory.CourseId, course.Id);
+        Assert.Equal("Алгоритмы", course.Title);
+        Assert.Equal("Основной тестовый курс", course.Description);
         Assert.Equal(2026, course.Year);
     }
 

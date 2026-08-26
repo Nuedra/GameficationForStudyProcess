@@ -15,6 +15,8 @@ using Platform.Core.Appraisals;
 using Platform.Core.Models;
 using Platform.Core.Processing;
 using Platform.DataAccess.Postgress;
+using Platform.DataAccess.Postgress.Lms;
+using Platform.Lms;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -118,6 +120,7 @@ builder.Services
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddDbContext<PlatformDbContext>(options =>
     options.UseNpgsql(GetConnectionString()));
+builder.Services.AddScoped<ILmsDataSource, LocalLmsDataSource>();
 builder.Services.AddScoped<IUserIdentityService, UserIdentityService>();
 builder.Services.AddScoped<IStudentCourseService, StudentCourseService>();
 builder.Services.AddScoped<IStudentAchievementGraphService, StudentAchievementGraphService>();
@@ -128,6 +131,7 @@ builder.Services.AddSingleton<IAppraisalFactsExtractor, AppraisalFactsExtractor>
 builder.Services.AddSingleton<IAppraisalPayloadProvider, FixedAppraisalPayloadProvider>();
 builder.Services.AddScoped(serviceProvider => new AchievementProcessingCycle(
     GetConnectionString(),
+    serviceProvider.GetRequiredService<ILmsDataSource>(),
     serviceProvider.GetRequiredService<IAppraisalPayloadProvider>(),
     serviceProvider.GetRequiredService<IAppraisalFactsExtractor>()));
 
