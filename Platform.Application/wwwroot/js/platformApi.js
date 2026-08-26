@@ -194,6 +194,107 @@
         }
     }
 
+    async function getManagedAchievements(courseId, year) {
+        try {
+            const response = await fetch(
+                `/api/staff/courses/${encodeURIComponent(courseId)}/${encodeURIComponent(year)}/achievements`,
+                { credentials: 'include' });
+            if (response.ok)
+                return { success: true, achievements: await response.json() };
+
+            return {
+                success: false,
+                status: response.status,
+                message: await readApiError(response, 'Не удалось загрузить достижения курса.')
+            };
+        } catch {
+            return { success: false, status: 0, message: networkError() };
+        }
+    }
+
+    async function saveManagedAchievement(courseId, year, achievementId, achievement) {
+        try {
+            const isCreate = !achievementId;
+            const url = isCreate
+                ? `/api/staff/courses/${encodeURIComponent(courseId)}/${encodeURIComponent(year)}/achievements`
+                : `/api/staff/courses/${encodeURIComponent(courseId)}/${encodeURIComponent(year)}/achievements/${encodeURIComponent(achievementId)}`;
+            const response = await protectedFetch(url, {
+                method: isCreate ? 'POST' : 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(achievement)
+            });
+            if (response.ok)
+                return { success: true, achievement: await response.json() };
+
+            return {
+                success: false,
+                status: response.status,
+                message: await readApiError(response, 'Не удалось сохранить достижение.')
+            };
+        } catch {
+            return { success: false, status: 0, message: networkError() };
+        }
+    }
+
+    async function deleteManagedAchievement(courseId, year, achievementId, revokeAwards) {
+        try {
+            const query = revokeAwards ? '?revokeAwards=true' : '';
+            const response = await protectedFetch(
+                `/api/staff/courses/${encodeURIComponent(courseId)}/${encodeURIComponent(year)}/achievements/${encodeURIComponent(achievementId)}${query}`,
+                { method: 'DELETE' });
+            if (response.ok)
+                return { success: true };
+
+            return {
+                success: false,
+                status: response.status,
+                message: await readApiError(response, 'Не удалось удалить достижение.')
+            };
+        } catch {
+            return { success: false, status: 0, message: networkError() };
+        }
+    }
+
+    async function saveManagedAchievementCriteria(courseId, year, achievementId, criteria) {
+        try {
+            const response = await protectedFetch(
+                `/api/staff/courses/${encodeURIComponent(courseId)}/${encodeURIComponent(year)}/achievements/${encodeURIComponent(achievementId)}/criteria`,
+                {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(criteria)
+                });
+            if (response.ok)
+                return { success: true, achievement: await response.json() };
+
+            return {
+                success: false,
+                status: response.status,
+                message: await readApiError(response, 'Не удалось сохранить критерий.')
+            };
+        } catch {
+            return { success: false, status: 0, message: networkError() };
+        }
+    }
+
+    async function deleteManagedAchievementCriteria(courseId, year, achievementId) {
+        try {
+            const response = await protectedFetch(
+                `/api/staff/courses/${encodeURIComponent(courseId)}/${encodeURIComponent(year)}/achievements/${encodeURIComponent(achievementId)}/criteria`,
+                { method: 'DELETE' });
+            if (response.ok)
+                return { success: true, achievement: await response.json() };
+
+            return {
+                success: false,
+                status: response.status,
+                message: await readApiError(response, 'Не удалось удалить критерий.')
+            };
+        } catch {
+            return { success: false, status: 0, message: networkError() };
+        }
+    }
+
     window.platformApi = {
         getCsrfToken,
         protectedFetch,
@@ -205,6 +306,11 @@
         getStaffCourse,
         getTeachingAssignments,
         saveTeachingAssignment,
-        endTeachingAssignment
+        endTeachingAssignment,
+        getManagedAchievements,
+        saveManagedAchievement,
+        deleteManagedAchievement,
+        saveManagedAchievementCriteria,
+        deleteManagedAchievementCriteria
     };
 })();

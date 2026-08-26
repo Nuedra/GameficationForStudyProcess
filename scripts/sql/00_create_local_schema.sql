@@ -34,6 +34,12 @@ CREATE TABLE IF NOT EXISTS "achievements" (
     "CourseID" uuid NOT NULL
 );
 
+-- Older EXT-03.2 revisions created this index before legacy demo data was
+-- aligned. Drop it during bootstrap so existing local databases can be
+-- recreated idempotently; title uniqueness is enforced by the application
+-- service for new and edited achievements.
+DROP INDEX IF EXISTS "IX_achievements_CourseID_Year_Title";
+
 CREATE INDEX IF NOT EXISTS "IX_achievements_CourseID"
     ON "achievements" ("CourseID");
 CREATE INDEX IF NOT EXISTS "IX_achievements_LabID"

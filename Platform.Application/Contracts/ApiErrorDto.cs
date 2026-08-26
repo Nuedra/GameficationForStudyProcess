@@ -39,6 +39,27 @@ public static class ApiErrors
     public static readonly ApiErrorDto LeadTeachingAssignmentConflict =
         new("lead_teaching_assignment_conflict", "На пересекающийся период уже назначен ведущий преподаватель.");
 
+    public static readonly ApiErrorDto AchievementNotFound =
+        new("achievement_not_found", "Достижение в указанном экземпляре курса не найдено.");
+
+    public static readonly ApiErrorDto AchievementCriteriaNotFound =
+        new("achievement_criteria_not_found", "Критерий достижения не найден.");
+
+    public static readonly ApiErrorDto InvalidAchievement =
+        new("invalid_achievement", "Проверьте название, описание и трек достижения.");
+
+    public static readonly ApiErrorDto InvalidAchievementCriteria =
+        new("invalid_achievement_criteria", "Критерий должен содержать хотя бы один тег; теги разделяются запятыми.");
+
+    public static readonly ApiErrorDto DuplicateAchievementTitle =
+        new("duplicate_achievement_title", "В этом экземпляре курса уже есть достижение с таким названием.");
+
+    public static readonly ApiErrorDto AchievementAwardsConfirmationRequired =
+        new("achievement_awards_confirmation_required", "Подтвердите удаление достижения вместе с отзывом всех его выдач студентам.");
+
+    public static readonly ApiErrorDto AchievementHasDependencies =
+        new("achievement_has_dependencies", "Нельзя удалить достижение, пока оно участвует в зависимостях графа.");
+
     public static readonly ApiErrorDto AchievementGraphTemplateNotFound =
         new("achievement_graph_template_not_found", "Шаблон графа достижений не найден. Обратитесь к администратору.");
 
