@@ -51,6 +51,25 @@ CREATE TABLE IF NOT EXISTS "course_instances" (
 CREATE UNIQUE INDEX IF NOT EXISTS "IX_course_instances_ContentScopeID"
     ON "course_instances" ("ContentScopeID");
 
+-- Временная локальная проекция Course.CourseInstanceTeachers из концептуальной
+-- LMS-схемы. PersonID намеренно не ссылается на students: преподаватели в
+-- текущем demo-режиме разрешаются из конфигурации, а не из таблицы людей.
+CREATE TABLE IF NOT EXISTS "course_instance_teachers" (
+    "CourseID" uuid NOT NULL,
+    "Year" integer NOT NULL,
+    "PersonID" uuid NOT NULL,
+    "StartDate" timestamptz NOT NULL,
+    "EndDate" timestamptz NULL,
+    "IsLead" boolean NOT NULL DEFAULT FALSE,
+    PRIMARY KEY ("CourseID", "Year", "PersonID"),
+    FOREIGN KEY ("CourseID", "Year")
+        REFERENCES "course_instances" ("CourseID", "Year") ON DELETE CASCADE,
+    CHECK ("EndDate" IS NULL OR "StartDate" < "EndDate")
+);
+
+CREATE INDEX IF NOT EXISTS "IX_course_instance_teachers_PersonID"
+    ON "course_instance_teachers" ("PersonID");
+
 CREATE TABLE IF NOT EXISTS "educational_groups" (
     "GroupName" text PRIMARY KEY,
     "GroupCaption" text NOT NULL,

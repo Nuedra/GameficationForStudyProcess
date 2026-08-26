@@ -7,7 +7,9 @@ namespace Platform.DataAccess.Postgress.Lms;
 /// Временная реализация контракта LMS поверх существующей локальной схемы.
 /// После появления LMS заменяется адаптером без изменения прикладных сервисов.
 /// </summary>
-public sealed class LocalLmsDataSource(LocalLmsDbContext dbContext) : ILmsDataSource
+public sealed class LocalLmsDataSource(LocalLmsDbContext dbContext) :
+    ILmsDataSource,
+    ILmsCourseManagementDataSource
 {
     public Task<LmsPerson?> GetPersonAsync(
         Guid personId,
@@ -80,5 +82,81 @@ public sealed class LocalLmsDataSource(LocalLmsDbContext dbContext) : ILmsDataSo
                 enrollment.CourseInstance.ContentScopeID,
                 enrollment.CourseInstance.Course.Description))
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<LmsCourseInstance>> GetAllCourseInstancesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var courses = dbContext.CourseInstances
+            .AsNoTracking()
+            .OrderByDescending(course => course.Year)
+            .ThenBy(course => course.Course.Title);
+
+        return await ProjectCourseInstances(courses)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<LmsCourseInstance>> GetAssignedCourseInstancesAsync(
+        Guid teacherId,
+        DateTimeOffset effectiveAt,
+        CancellationToken cancellationToken = default)
+    {
+        var effectiveAtUtc = effectiveAt.UtcDateTime;
+        var courses = dbContext.CourseInstanceTeachers
+            .AsNoTracking()
+            .Where(assignment =>
+                assignment.PersonID == teacherId &&
+                assignment.StartDate <= effectiveAtUtc &&
+                (!assignment.EndDate.HasValue || assignment.EndDate.Value >= effectiveAtUtc))
+            .Select(assignment => assignment.CourseInstance)
+            .OrderByDescending(course => course.Year)
+            .ThenBy(course => course.Course.Title);
+
+        return await ProjectCourseInstances(courses)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<LmsCourseInstance?> GetCourseInstanceAsync(
+        Guid courseId,
+        int year,
+        CancellationToken cancellationToken = default)
+    {
+        return ProjectCourseInstances(
+                dbContext.CourseInstances
+                    .AsNoTracking()
+                    .Where(course => course.CourseID == courseId && course.Year == year))
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
+    public Task<bool> HasActiveTeachingAssignmentAsync(
+        Guid teacherId,
+        Guid courseId,
+        int year,
+        DateTimeOffset effectiveAt,
+        CancellationToken cancellationToken = default)
+    {
+        var effectiveAtUtc = effectiveAt.UtcDateTime;
+
+        return dbContext.CourseInstanceTeachers
+            .AsNoTracking()
+            .AnyAsync(
+                assignment =>
+                    assignment.PersonID == teacherId &&
+                    assignment.CourseID == courseId &&
+                    assignment.Year == year &&
+                    assignment.StartDate <= effectiveAtUtc &&
+                    (!assignment.EndDate.HasValue || assignment.EndDate.Value >= effectiveAtUtc),
+                cancellationToken);
+    }
+
+    private static IQueryable<LmsCourseInstance> ProjectCourseInstances(
+        IQueryable<CourseInstanceEntity> query)
+    {
+        return query.Select(course => new LmsCourseInstance(
+            course.CourseID,
+            course.Year,
+            course.Course.Title,
+            course.ContentScopeID,
+            course.Course.Description));
     }
 }

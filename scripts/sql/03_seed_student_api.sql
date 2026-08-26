@@ -84,6 +84,25 @@ VALUES
 ON CONFLICT ("CourseID", "Year") DO UPDATE SET
     "ContentScopeID" = EXCLUDED."ContentScopeID";
 
+-- Тестовый преподаватель назначен только на первый экземпляр курса.
+-- Администратор получает доступ ко всем экземплярам по роли и не требует
+-- отдельной строки назначения.
+INSERT INTO "course_instance_teachers"
+    ("CourseID", "Year", "PersonID", "StartDate", "EndDate", "IsLead")
+VALUES
+(
+    'a1000000-0000-0000-0000-000000000001',
+    2026,
+    'b1000000-0000-0000-0000-000000000001',
+    TIMESTAMPTZ '2026-01-01T00:00:00Z',
+    NULL,
+    TRUE
+)
+ON CONFLICT ("CourseID", "Year", "PersonID") DO UPDATE SET
+    "StartDate" = EXCLUDED."StartDate",
+    "EndDate" = EXCLUDED."EndDate",
+    "IsLead" = EXCLUDED."IsLead";
+
 INSERT INTO "educational_groups"
     ("GroupName", "GroupCaption", "EdProgramID", "AdmissionYear", "StartDate", "EndDate")
 VALUES

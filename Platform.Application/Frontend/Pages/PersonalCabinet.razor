@@ -1,0 +1,62 @@
+@page "/cabinet"
+@attribute [Authorize(Roles = "teacher,administrator")]
+
+<PageTitle>Личный кабинет — Платформа достижений</PageTitle>
+
+<AuthorizeView Roles="teacher">
+    <Authorized>
+        <h1>Кабинет преподавателя</h1>
+        <p class="lead text-muted">
+            Здесь собраны назначенные вам экземпляры курсов и будущие инструменты управления достижениями.
+        </p>
+    </Authorized>
+</AuthorizeView>
+
+<AuthorizeView Roles="administrator">
+    <Authorized>
+        <h1>Кабинет администратора</h1>
+        <p class="lead text-muted">
+            Здесь доступны все экземпляры курсов и административные разделы платформы.
+        </p>
+    </Authorized>
+</AuthorizeView>
+
+<div class="row g-3 mt-2">
+    <div class="col-md-6 col-xl-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Экземпляры курсов</h5>
+                <p class="card-text text-muted">
+                    Преподаватель видит только активные назначения, администратор — все курсы из LMS.
+                </p>
+                <a class="btn btn-primary" href="staff/courses">Открыть курсы</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-4">
+        <div class="card h-100 border-secondary">
+            <div class="card-body">
+                <h5 class="card-title">Достижения и граф</h5>
+                <p class="card-text text-muted">
+                    Редактирование достижений, критериев и структуры графа появится на следующем этапе EXT-03.
+                </p>
+                <button class="btn btn-outline-secondary" disabled>Скоро</button>
+            </div>
+        </div>
+    </div>
+    <AuthorizeView Roles="administrator">
+        <Authorized>
+            <div class="col-md-6 col-xl-4">
+                <div class="card h-100 border-secondary">
+                    <div class="card-body">
+                        <h5 class="card-title">Группы и зачисления</h5>
+                        <p class="card-text text-muted">
+                            Изменяющие операции будут подключены после согласования командного контракта LMS.
+                        </p>
+                        <button class="btn btn-outline-secondary" disabled>Только чтение</button>
+                    </div>
+                </div>
+            </div>
+        </Authorized>
+    </AuthorizeView>
+</div>

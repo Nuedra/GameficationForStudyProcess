@@ -98,12 +98,48 @@
         }
     }
 
+    async function getStaffCourses() {
+        try {
+            const response = await fetch('/api/staff/courses', { credentials: 'include' });
+            if (response.ok)
+                return { success: true, courses: await response.json() };
+
+            return {
+                success: false,
+                status: response.status,
+                message: await readApiError(response, 'Не удалось загрузить курсы кабинета.')
+            };
+        } catch {
+            return { success: false, status: 0, message: networkError() };
+        }
+    }
+
+    async function getStaffCourse(courseId, year) {
+        try {
+            const response = await fetch(
+                `/api/staff/courses/${encodeURIComponent(courseId)}/${encodeURIComponent(year)}`,
+                { credentials: 'include' });
+            if (response.ok)
+                return { success: true, course: await response.json() };
+
+            return {
+                success: false,
+                status: response.status,
+                message: await readApiError(response, 'Не удалось загрузить экземпляр курса.')
+            };
+        } catch {
+            return { success: false, status: 0, message: networkError() };
+        }
+    }
+
     window.platformApi = {
         getCsrfToken,
         protectedFetch,
         getCurrentUser,
         login,
         logout,
-        getCourses
+        getCourses,
+        getStaffCourses,
+        getStaffCourse
     };
 })();

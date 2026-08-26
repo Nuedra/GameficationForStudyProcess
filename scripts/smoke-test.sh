@@ -72,6 +72,13 @@ expect_body_contains() {
         fail "response does not contain: $expected_text"
 }
 
+expect_body_not_contains() {
+    local unexpected_text="$1"
+    if grep -Fq "$unexpected_text" "$response_body"; then
+        fail "response unexpectedly contains: $unexpected_text"
+    fi
+}
+
 get_csrf_token() {
     local cookie_file="$1"
     if [[ ! -f "$cookie_file" ]]; then
@@ -140,6 +147,7 @@ achievement_three_id="00000000-0000-0000-0000-000000000003"
 echo "Checking unauthenticated and invalid-login responses..."
 expect_status 401 "$base_url/api/auth/me"
 expect_status 401 "$base_url/api/student/courses"
+expect_status 401 "$base_url/api/staff/courses"
 expect_status 400 \
     --header "Content-Type: application/json" \
     --data "{\"id\":\"$student_id\"}" \
@@ -169,6 +177,8 @@ expect_body_contains "$student_id"
 
 expect_status 200 --cookie "$student_cookie" "$base_url/api/student/courses"
 expect_body_contains "$course_id"
+expect_status 403 --cookie "$student_cookie" "$base_url/api/staff/courses"
+expect_body_contains '"code":"access_denied"'
 
 expect_status 200 \
     --cookie "$student_cookie" \
@@ -227,6 +237,16 @@ expect_status 200 \
 expect_body_contains '"role":"teacher"'
 expect_status 403 --cookie "$teacher_cookie" "$base_url/api/student/courses"
 expect_body_contains '"code":"access_denied"'
+expect_status 200 --cookie "$teacher_cookie" "$base_url/api/staff/courses"
+expect_body_contains "$course_id"
+expect_body_not_contains "$foreign_course_id"
+expect_status 200 \
+    --cookie "$teacher_cookie" \
+    "$base_url/api/staff/courses/$course_id/2026"
+expect_status 403 \
+    --cookie "$teacher_cookie" \
+    "$base_url/api/staff/courses/$foreign_course_id/2026"
+expect_body_contains '"code":"course_access_denied"'
 
 expect_status 200 \
     --cookie "$administrator_cookie" \
@@ -238,6 +258,12 @@ expect_status 200 \
 expect_body_contains '"role":"administrator"'
 expect_status 200 --cookie "$administrator_cookie" "$base_url/api/auth/session"
 expect_body_contains '"sessionId"'
+expect_status 200 --cookie "$administrator_cookie" "$base_url/api/staff/courses"
+expect_body_contains "$course_id"
+expect_body_contains "$foreign_course_id"
+expect_status 200 \
+    --cookie "$administrator_cookie" \
+    "$base_url/api/staff/courses/$foreign_course_id/2026"
 
 echo "Checking that the Vue graph component accepts XML..."
 npm ci --prefix "Graph.Component"

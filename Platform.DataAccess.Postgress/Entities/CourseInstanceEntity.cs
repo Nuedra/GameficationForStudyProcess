@@ -10,4 +10,5 @@ public sealed class CourseInstanceEntity
     public DateTime CreatedAt { get; set; }
 
     public List<CourseInstanceStudentEntity> Students { get; set; } = [];
+    public List<CourseInstanceTeacherEntity> Teachers { get; set; } = [];
 }

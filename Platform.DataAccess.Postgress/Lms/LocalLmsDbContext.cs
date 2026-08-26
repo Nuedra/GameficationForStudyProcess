@@ -13,6 +13,7 @@ public sealed class LocalLmsDbContext(DbContextOptions<LocalLmsDbContext> option
     public DbSet<CourseEntity> Courses => Set<CourseEntity>();
     public DbSet<CourseInstanceEntity> CourseInstances => Set<CourseInstanceEntity>();
     public DbSet<CourseInstanceStudentEntity> CourseInstanceStudents => Set<CourseInstanceStudentEntity>();
+    public DbSet<CourseInstanceTeacherEntity> CourseInstanceTeachers => Set<CourseInstanceTeacherEntity>();
     public DbSet<EducationalGroupEntity> EducationalGroups => Set<EducationalGroupEntity>();
     public DbSet<GroupStudentEntity> GroupStudents => Set<GroupStudentEntity>();
 
@@ -24,8 +25,34 @@ public sealed class LocalLmsDbContext(DbContextOptions<LocalLmsDbContext> option
         ConfigureCourses(modelBuilder);
         ConfigureCourseInstances(modelBuilder);
         ConfigureCourseInstanceStudents(modelBuilder);
+        ConfigureCourseInstanceTeachers(modelBuilder);
         ConfigureEducationalGroups(modelBuilder);
         ConfigureGroupStudents(modelBuilder);
+    }
+
+    private static void ConfigureCourseInstanceTeachers(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<CourseInstanceTeacherEntity>(entity =>
+        {
+            entity.ToTable("course_instance_teachers");
+            entity.HasKey(assignment => new
+            {
+                assignment.CourseID,
+                assignment.Year,
+                assignment.PersonID
+            });
+
+            entity.Property(assignment => assignment.StartDate).IsRequired();
+            entity.Property(assignment => assignment.EndDate).IsRequired(false);
+            entity.Property(assignment => assignment.IsLead)
+                .IsRequired()
+                .HasDefaultValue(false);
+
+            entity.HasOne(assignment => assignment.CourseInstance)
+                .WithMany(course => course.Teachers)
+                .HasForeignKey(assignment => new { assignment.CourseID, assignment.Year })
+                .OnDelete(DeleteBehavior.Cascade);
+        });
     }
 
     private static void ConfigureStudents(ModelBuilder modelBuilder)

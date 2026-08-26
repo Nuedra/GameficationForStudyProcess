@@ -1,0 +1,112 @@
+@page "/staff/courses/{CourseId:guid}/{Year:int}"
+@attribute [Authorize(Roles = "teacher,administrator")]
+@inject IJSRuntime JsRuntime
+
+<PageTitle>Кабинет курса — Платформа достижений</PageTitle>
+
+@if (_isLoading)
+{
+    <div class="d-flex align-items-center gap-2 mt-3">
+        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+        <span class="text-muted">Проверка доступа...</span>
+    </div>
+}
+else if (_error is not null)
+{
+    <div class="alert alert-danger mt-3">@_error</div>
+    <a class="btn btn-outline-secondary" href="staff/courses">Вернуться к курсам</a>
+}
+else if (_course is not null)
+{
+    <div class="d-flex justify-content-between align-items-start mb-3">
+        <div>
+            <h1 class="mb-1">@_course.Title</h1>
+            <p class="text-muted mb-0">Экземпляр курса за @_course.Year год</p>
+        </div>
+        <span class="badge bg-secondary fs-6">Только чтение</span>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_course.Description))
+    {
+        <p>@_course.Description</p>
+    }
+
+    <div class="alert alert-info">
+        Объектный доступ подтверждён сервером. Управление достижениями и графом будет добавлено в EXT-03.2–03.5.
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-4">
+            <div class="card h-100"><div class="card-body">
+                <h5 class="card-title">Достижения</h5>
+                <p class="text-muted mb-0">Просмотр и редактирование появятся на следующем этапе.</p>
+            </div></div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100"><div class="card-body">
+                <h5 class="card-title">Граф</h5>
+                <p class="text-muted mb-0">Черновики, валидация и публикация будут добавлены позднее.</p>
+            </div></div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100"><div class="card-body">
+                <h5 class="card-title">Студенты</h5>
+                <p class="text-muted mb-0">Состав курса остаётся read-only данными LMS.</p>
+            </div></div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid CourseId { get; set; }
+    [Parameter] public int Year { get; set; }
+
+    private bool _isLoading = true;
+    private CourseInfo? _course;
+    private string? _error;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            await LoadCourseAsync();
+    }
+
+    private async Task LoadCourseAsync()
+    {
+        try
+        {
+            var result = await JsRuntime.InvokeAsync<CourseResult>(
+                "platformApi.getStaffCourse",
+                CourseId,
+                Year);
+            if (result.Success)
+                _course = result.Course;
+            else
+                _error = result.Message ?? "Не удалось открыть экземпляр курса.";
+        }
+        catch
+        {
+            _error = "Не удалось связаться с сервером. Проверьте подключение и повторите запрос.";
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private sealed class CourseInfo
+    {
+        public Guid Id { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public int Year { get; set; }
+    }
+
+    private sealed class CourseResult
+    {
+        public bool Success { get; set; }
+        public string? Message { get; set; }
+        public CourseInfo? Course { get; set; }
+    }
+}
