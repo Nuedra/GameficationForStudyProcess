@@ -1,6 +1,7 @@
 @page "/staff/courses/{CourseId:guid}/{Year:int}"
 @attribute [Authorize(Roles = "teacher,administrator")]
 @inject IJSRuntime JsRuntime
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Кабинет курса — Платформа достижений</PageTitle>
 
@@ -23,17 +24,20 @@ else if (_course is not null)
             <h1 class="mb-1">@_course.Title</h1>
             <p class="text-muted mb-0">Экземпляр курса за @_course.Year год</p>
         </div>
-        <span class="badge bg-secondary fs-6">Только чтение</span>
+        @if (_isAdministrator)
+        {
+            <span class="badge bg-primary fs-6">Администрирование</span>
+        }
+        else
+        {
+            <span class="badge bg-secondary fs-6">Только чтение</span>
+        }
     </div>
 
     @if (!string.IsNullOrWhiteSpace(_course.Description))
     {
         <p>@_course.Description</p>
     }
-
-    <div class="alert alert-info">
-        Объектный доступ подтверждён сервером. Управление достижениями и графом будет добавлено в EXT-03.2–03.5.
-    </div>
 
     <div class="row g-3">
         <div class="col-md-4">
@@ -55,6 +59,150 @@ else if (_course is not null)
             </div></div>
         </div>
     </div>
+
+    @if (_isAdministrator)
+    {
+        <section class="mt-4" aria-labelledby="teaching-assignments-title">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h2 id="teaching-assignments-title" class="h4 mb-1">Преподаватели курса</h2>
+                    <p class="text-muted mb-0">
+                        Назначения относятся именно к этому экземпляру курса и учитывают период действия.
+                    </p>
+                </div>
+            </div>
+
+            @if (_assignmentsLoading)
+            {
+                <div class="d-flex align-items-center gap-2">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                    <span class="text-muted">Загрузка назначений...</span>
+                </div>
+            }
+            else
+            {
+                @if (_assignmentError is not null)
+                {
+                    <div class="alert alert-danger">@_assignmentError</div>
+                }
+                @if (_assignmentSuccess is not null)
+                {
+                    <div class="alert alert-success">@_assignmentSuccess</div>
+                }
+
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h3 class="h5">Назначить или изменить преподавателя</h3>
+                        @if (_availableTeachers.Count == 0)
+                        {
+                            <p class="text-muted mb-0">
+                                В конфигурации нет активных пользователей с ролью преподавателя.
+                            </p>
+                        }
+                        else
+                        {
+                            <div class="row g-3 align-items-end">
+                                <div class="col-lg-4">
+                                    <label class="form-label" for="teacher-select">Преподаватель</label>
+                                    <select id="teacher-select" class="form-select" @bind="_selectedTeacherId">
+                                        @foreach (var teacher in _availableTeachers)
+                                        {
+                                            <option value="@teacher.Id">@teacher.DisplayName</option>
+                                        }
+                                    </select>
+                                </div>
+                                <div class="col-md-4 col-lg-2">
+                                    <label class="form-label" for="assignment-start">Дата начала</label>
+                                    <input id="assignment-start" class="form-control" type="date"
+                                           value="@_startDate"
+                                           @onchange="eventArgs => _startDate = eventArgs.Value?.ToString() ?? string.Empty" />
+                                </div>
+                                <div class="col-md-4 col-lg-2">
+                                    <label class="form-label" for="assignment-end">Дата окончания</label>
+                                    <input id="assignment-end" class="form-control" type="date"
+                                           value="@_endDate"
+                                           @onchange="eventArgs => _endDate = eventArgs.Value?.ToString() ?? string.Empty" />
+                                </div>
+                                <div class="col-md-4 col-lg-2">
+                                    <div class="form-check mb-2">
+                                        <input id="assignment-lead" class="form-check-input" type="checkbox" @bind="_isLead" />
+                                        <label class="form-check-label" for="assignment-lead">Ведущий</label>
+                                    </div>
+                                </div>
+                                <div class="col-lg-2">
+                                    <button class="btn btn-primary w-100"
+                                            disabled="@_assignmentSaving"
+                                            @onclick="SaveAssignmentAsync">
+                                        @(_assignmentSaving ? "Сохранение..." : "Сохранить")
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="form-text mt-2">
+                                Пустая дата окончания означает бессрочное назначение. Повторное сохранение изменяет существующую запись.
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                @if (_assignments.Count == 0)
+                {
+                    <div class="alert alert-secondary">На курс ещё не назначены преподаватели.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Преподаватель</th>
+                                    <th scope="col">Роль</th>
+                                    <th scope="col">Период</th>
+                                    <th scope="col">Состояние</th>
+                                    <th scope="col" class="text-end">Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var assignment in _assignments)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div>@assignment.TeacherName</div>
+                                            <small class="text-muted">@assignment.TeacherId</small>
+                                        </td>
+                                        <td>@(assignment.IsLead ? "Ведущий" : "Ассистент")</td>
+                                        <td>
+                                            @FormatDate(assignment.StartDate) —
+                                            @(assignment.EndDate.HasValue ? FormatDate(assignment.EndDate.Value) : "без окончания")
+                                        </td>
+                                        <td>
+                                            <span class="badge @(assignment.IsActive ? "bg-success" : "bg-secondary")">
+                                                @(assignment.IsActive ? "Действует" : "Не действует")
+                                            </span>
+                                        </td>
+                                        <td class="text-end">
+                                            <button class="btn btn-sm btn-outline-primary me-2"
+                                                    disabled="@_assignmentSaving"
+                                                    @onclick="() => EditAssignment(assignment)">
+                                                Изменить
+                                            </button>
+                                            @if (assignment.IsActive)
+                                            {
+                                                <button class="btn btn-sm btn-outline-danger"
+                                                        disabled="@_assignmentSaving"
+                                                        @onclick="() => EndAssignmentAsync(assignment)">
+                                                    Завершить
+                                                </button>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            }
+        </section>
+    }
 }
 
 @code {
@@ -62,14 +210,157 @@ else if (_course is not null)
     [Parameter] public int Year { get; set; }
 
     private bool _isLoading = true;
+    private bool _isAdministrator;
     private CourseInfo? _course;
     private string? _error;
+    private bool _assignmentsLoading;
+    private bool _assignmentSaving;
+    private string? _assignmentError;
+    private string? _assignmentSuccess;
+    private string _selectedTeacherId = string.Empty;
+    private string _startDate = DateTimeOffset.Now.ToString("yyyy-MM-dd");
+    private string _endDate = string.Empty;
+    private bool _isLead;
+    private List<TeacherOption> _availableTeachers = [];
+    private List<TeachingAssignmentInfo> _assignments = [];
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
-            await LoadCourseAsync();
+        if (!firstRender)
+            return;
+
+        var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        _isAdministrator = authenticationState.User.IsInRole("administrator");
+        await LoadCourseAsync();
+        if (_course is not null && _isAdministrator)
+            await LoadAssignmentsAsync();
     }
+
+    private async Task LoadAssignmentsAsync()
+    {
+        _assignmentsLoading = true;
+        _assignmentError = null;
+        try
+        {
+            var result = await JsRuntime.InvokeAsync<AssignmentResult>(
+                "platformApi.getTeachingAssignments",
+                CourseId,
+                Year);
+            if (result.Success && result.Management is not null)
+                ApplyManagement(result.Management);
+            else
+                _assignmentError = result.Message ?? "Не удалось загрузить назначения преподавателей.";
+        }
+        catch
+        {
+            _assignmentError = "Не удалось связаться с сервером. Проверьте подключение и повторите запрос.";
+        }
+        finally
+        {
+            _assignmentsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SaveAssignmentAsync()
+    {
+        _assignmentError = null;
+        _assignmentSuccess = null;
+        if (!Guid.TryParse(_selectedTeacherId, out var teacherId) ||
+            string.IsNullOrWhiteSpace(_startDate))
+        {
+            _assignmentError = "Выберите преподавателя и дату начала.";
+            return;
+        }
+
+        _assignmentSaving = true;
+        try
+        {
+            var result = await JsRuntime.InvokeAsync<AssignmentResult>(
+                "platformApi.saveTeachingAssignment",
+                CourseId,
+                Year,
+                teacherId,
+                _startDate,
+                string.IsNullOrWhiteSpace(_endDate) ? null : _endDate,
+                _isLead);
+            if (result.Success && result.Management is not null)
+            {
+                ApplyManagement(result.Management);
+                _assignmentSuccess = "Назначение преподавателя сохранено.";
+            }
+            else
+            {
+                _assignmentError = result.Message ?? "Не удалось сохранить назначение преподавателя.";
+            }
+        }
+        catch
+        {
+            _assignmentError = "Не удалось связаться с сервером. Проверьте подключение и повторите запрос.";
+        }
+        finally
+        {
+            _assignmentSaving = false;
+        }
+    }
+
+    private async Task EndAssignmentAsync(TeachingAssignmentInfo assignment)
+    {
+        var confirmed = await JsRuntime.InvokeAsync<bool>(
+            "confirm",
+            $"Завершить назначение преподавателя «{assignment.TeacherName}» текущим моментом?");
+        if (!confirmed)
+            return;
+
+        _assignmentSaving = true;
+        _assignmentError = null;
+        _assignmentSuccess = null;
+        try
+        {
+            var result = await JsRuntime.InvokeAsync<AssignmentResult>(
+                "platformApi.endTeachingAssignment",
+                CourseId,
+                Year,
+                assignment.TeacherId);
+            if (result.Success && result.Management is not null)
+            {
+                ApplyManagement(result.Management);
+                _assignmentSuccess = "Назначение преподавателя завершено.";
+            }
+            else
+            {
+                _assignmentError = result.Message ?? "Не удалось завершить назначение преподавателя.";
+            }
+        }
+        catch
+        {
+            _assignmentError = "Не удалось связаться с сервером. Проверьте подключение и повторите запрос.";
+        }
+        finally
+        {
+            _assignmentSaving = false;
+        }
+    }
+
+    private void EditAssignment(TeachingAssignmentInfo assignment)
+    {
+        _selectedTeacherId = assignment.TeacherId.ToString();
+        _startDate = assignment.StartDate.ToString("yyyy-MM-dd");
+        _endDate = assignment.EndDate?.ToString("yyyy-MM-dd") ?? string.Empty;
+        _isLead = assignment.IsLead;
+        _assignmentError = null;
+        _assignmentSuccess = "Данные назначения перенесены в форму. Измените их и нажмите «Сохранить».";
+    }
+
+    private void ApplyManagement(TeachingAssignmentManagement management)
+    {
+        _availableTeachers = management.AvailableTeachers;
+        _assignments = management.Assignments;
+        if (string.IsNullOrWhiteSpace(_selectedTeacherId) && _availableTeachers.Count > 0)
+            _selectedTeacherId = _availableTeachers[0].Id.ToString();
+    }
+
+    private static string FormatDate(DateTimeOffset date) => date.ToString("dd.MM.yyyy");
 
     private async Task LoadCourseAsync()
     {
@@ -108,5 +399,36 @@ else if (_course is not null)
         public bool Success { get; set; }
         public string? Message { get; set; }
         public CourseInfo? Course { get; set; }
+    }
+
+    private sealed class TeacherOption
+    {
+        public Guid Id { get; set; }
+        public string DisplayName { get; set; } = string.Empty;
+    }
+
+    private sealed class TeachingAssignmentInfo
+    {
+        public Guid TeacherId { get; set; }
+        public string TeacherName { get; set; } = string.Empty;
+        public DateTimeOffset StartDate { get; set; }
+        public DateTimeOffset? EndDate { get; set; }
+        public bool IsLead { get; set; }
+        public bool IsActive { get; set; }
+    }
+
+    private sealed class TeachingAssignmentManagement
+    {
+        public Guid CourseId { get; set; }
+        public int Year { get; set; }
+        public List<TeacherOption> AvailableTeachers { get; set; } = [];
+        public List<TeachingAssignmentInfo> Assignments { get; set; } = [];
+    }
+
+    private sealed class AssignmentResult
+    {
+        public bool Success { get; set; }
+        public string? Message { get; set; }
+        public TeachingAssignmentManagement? Management { get; set; }
     }
 }

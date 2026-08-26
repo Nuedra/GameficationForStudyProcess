@@ -132,6 +132,68 @@
         }
     }
 
+    async function getTeachingAssignments(courseId, year) {
+        try {
+            const response = await fetch(
+                `/api/admin/courses/${encodeURIComponent(courseId)}/${encodeURIComponent(year)}/teachers`,
+                { credentials: 'include' });
+            if (response.ok)
+                return { success: true, management: await response.json() };
+
+            return {
+                success: false,
+                status: response.status,
+                message: await readApiError(response, 'Не удалось загрузить назначения преподавателей.')
+            };
+        } catch {
+            return { success: false, status: 0, message: networkError() };
+        }
+    }
+
+    async function saveTeachingAssignment(courseId, year, teacherId, startDate, endDate, isLead) {
+        try {
+            const response = await protectedFetch(
+                `/api/admin/courses/${encodeURIComponent(courseId)}/${encodeURIComponent(year)}/teachers/${encodeURIComponent(teacherId)}`,
+                {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        startDate: `${startDate}T00:00:00Z`,
+                        endDate: endDate ? `${endDate}T00:00:00Z` : null,
+                        isLead
+                    })
+                });
+            if (response.ok)
+                return { success: true, management: await response.json() };
+
+            return {
+                success: false,
+                status: response.status,
+                message: await readApiError(response, 'Не удалось сохранить назначение преподавателя.')
+            };
+        } catch {
+            return { success: false, status: 0, message: networkError() };
+        }
+    }
+
+    async function endTeachingAssignment(courseId, year, teacherId) {
+        try {
+            const response = await protectedFetch(
+                `/api/admin/courses/${encodeURIComponent(courseId)}/${encodeURIComponent(year)}/teachers/${encodeURIComponent(teacherId)}/end`,
+                { method: 'POST' });
+            if (response.ok)
+                return { success: true, management: await response.json() };
+
+            return {
+                success: false,
+                status: response.status,
+                message: await readApiError(response, 'Не удалось завершить назначение преподавателя.')
+            };
+        } catch {
+            return { success: false, status: 0, message: networkError() };
+        }
+    }
+
     window.platformApi = {
         getCsrfToken,
         protectedFetch,
@@ -140,6 +202,9 @@
         logout,
         getCourses,
         getStaffCourses,
-        getStaffCourse
+        getStaffCourse,
+        getTeachingAssignments,
+        saveTeachingAssignment,
+        endTeachingAssignment
     };
 })();

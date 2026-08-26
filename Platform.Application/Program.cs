@@ -129,10 +129,13 @@ builder.Services.AddScoped<ILmsDataSource>(serviceProvider =>
     serviceProvider.GetRequiredService<LocalLmsDataSource>());
 builder.Services.AddScoped<ILmsCourseManagementDataSource>(serviceProvider =>
     serviceProvider.GetRequiredService<LocalLmsDataSource>());
+builder.Services.AddScoped<ILmsTeachingAssignmentDataSource>(serviceProvider =>
+    serviceProvider.GetRequiredService<LocalLmsDataSource>());
 builder.Services.AddSingleton<IAccessPolicyService, AccessPolicyService>();
 builder.Services.AddScoped<IUserIdentityService, UserIdentityService>();
 builder.Services.AddScoped<IStudentCourseService, StudentCourseService>();
 builder.Services.AddScoped<IStaffCourseService, StaffCourseService>();
+builder.Services.AddScoped<ITeachingAssignmentService, TeachingAssignmentService>();
 builder.Services.AddScoped<IStudentAchievementGraphService, StudentAchievementGraphService>();
 builder.Services.AddSingleton<IAchievementGraphTemplateProvider, FileAchievementGraphTemplateProvider>();
 builder.Services.AddSingleton<IAchievementGraphXmlSerializer, AchievementGraphXmlSerializer>();

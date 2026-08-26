@@ -9,7 +9,8 @@ namespace Platform.DataAccess.Postgress.Lms;
 /// </summary>
 public sealed class LocalLmsDataSource(LocalLmsDbContext dbContext) :
     ILmsDataSource,
-    ILmsCourseManagementDataSource
+    ILmsCourseManagementDataSource,
+    ILmsTeachingAssignmentDataSource
 {
     public Task<LmsPerson?> GetPersonAsync(
         Guid personId,
@@ -147,6 +148,88 @@ public sealed class LocalLmsDataSource(LocalLmsDbContext dbContext) :
                     assignment.StartDate <= effectiveAtUtc &&
                     (!assignment.EndDate.HasValue || assignment.EndDate.Value >= effectiveAtUtc),
                 cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<LmsTeachingAssignment>> GetTeachingAssignmentsAsync(
+        Guid courseId,
+        int year,
+        CancellationToken cancellationToken = default)
+    {
+        return await dbContext.CourseInstanceTeachers
+            .AsNoTracking()
+            .Where(assignment =>
+                assignment.CourseID == courseId && assignment.Year == year)
+            .OrderByDescending(assignment => assignment.IsLead)
+            .ThenBy(assignment => assignment.StartDate)
+            .Select(assignment => new LmsTeachingAssignment(
+                assignment.CourseID,
+                assignment.Year,
+                assignment.PersonID,
+                new DateTimeOffset(assignment.StartDate, TimeSpan.Zero),
+                assignment.EndDate.HasValue
+                    ? new DateTimeOffset(assignment.EndDate.Value, TimeSpan.Zero)
+                    : null,
+                assignment.IsLead))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<LmsTeachingAssignment> SaveTeachingAssignmentAsync(
+        Guid courseId,
+        int year,
+        Guid teacherId,
+        DateTimeOffset startDate,
+        DateTimeOffset? endDate,
+        bool isLead,
+        CancellationToken cancellationToken = default)
+    {
+        var assignment = await dbContext.CourseInstanceTeachers.FindAsync(
+            [courseId, year, teacherId],
+            cancellationToken);
+
+        if (assignment is null)
+        {
+            assignment = new CourseInstanceTeacherEntity
+            {
+                CourseID = courseId,
+                Year = year,
+                PersonID = teacherId
+            };
+            dbContext.CourseInstanceTeachers.Add(assignment);
+        }
+
+        assignment.StartDate = startDate.UtcDateTime;
+        assignment.EndDate = endDate?.UtcDateTime;
+        assignment.IsLead = isLead;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return new LmsTeachingAssignment(
+            assignment.CourseID,
+            assignment.Year,
+            assignment.PersonID,
+            new DateTimeOffset(assignment.StartDate, TimeSpan.Zero),
+            assignment.EndDate.HasValue
+                ? new DateTimeOffset(assignment.EndDate.Value, TimeSpan.Zero)
+                : null,
+            assignment.IsLead);
+    }
+
+    public async Task<bool> EndTeachingAssignmentAsync(
+        Guid courseId,
+        int year,
+        Guid teacherId,
+        DateTimeOffset endedAt,
+        CancellationToken cancellationToken = default)
+    {
+        var assignment = await dbContext.CourseInstanceTeachers.FindAsync(
+            [courseId, year, teacherId],
+            cancellationToken);
+        if (assignment is null)
+            return false;
+
+        assignment.EndDate = endedAt.UtcDateTime;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     private static IQueryable<LmsCourseInstance> ProjectCourseInstances(
