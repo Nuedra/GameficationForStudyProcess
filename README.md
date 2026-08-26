@@ -30,7 +30,8 @@ cp ".env.example" ".env"
 ./scripts/local-run.sh
 ```
 
-`local-setup.sh` ожидает готовности PostgreSQL, применяет миграции и загружает
+`local-setup.sh` ожидает готовности PostgreSQL, применяет временную локальную
+SQL-схему и загружает
 демонстрационные данные студенческого API. `local-run.sh` запускает приложение
 с теми же параметрами подключения. После старта приложение доступно по адресу
 `http://localhost:5284`, а Swagger — по адресу `http://localhost:5284/swagger`.
@@ -70,7 +71,8 @@ curl http://localhost:5284/health/ready
 
 ### Автоматическая smoke-проверка
 
-Одна команда подготавливает Docker PostgreSQL, применяет миграции и seed,
+Одна команда подготавливает Docker PostgreSQL, применяет временную локальную
+SQL-схему и seed,
 запускает приложение, проверяет аутентификацию, курсы, граф достижений,
 обновление графа, logout и основные отрицательные ответы API. В конце она
 запускает Vitest-проверки Vue-компонента, которые подтверждают передачу XML в
@@ -83,18 +85,20 @@ curl http://localhost:5284/health/ready
 Сценарий использует только демонстрационные данные. Он запускает временный
 экземпляр приложения и после завершения автоматически его останавливает.
 
-### Ручная работа с миграциями
+### Состояние схемы и локальный bootstrap
 
-Если требуется запускать EF Core вручную, сначала загрузите настройки текущей
-локальной базы. Нельзя использовать прежнюю переменную `PLATFORM_DB_CONNECTION`:
-приложение и EF Core используют только `ConnectionStrings__Platform`.
+EF Core migrations временно удалены: схема LMS ещё не существует, а новая
+схема достижений пока не зафиксирована. Для disposable Docker-базы используется
+идемпотентный SQL-bootstrap:
 
 ```bash
 source scripts/local-env.sh
-dotnet ef database update \
-  --project "Platform.DataAccess.Postgress/Platform.DataAccess.Postgress.csproj" \
-  --startup-project "Platform.DataAccess.Postgress/Platform.DataAccess.Postgress.csproj"
+docker compose exec -T postgres \
+  psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+  < "scripts/sql/00_create_local_schema.sql"
 ```
+
+Скрипт не является migration и не описывает будущую физическую схему LMS.
 
 ## Проверка тестовых запросов к БД
 
