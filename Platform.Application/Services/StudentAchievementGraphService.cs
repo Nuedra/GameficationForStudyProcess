@@ -2,11 +2,13 @@ using Microsoft.EntityFrameworkCore;
 using Platform.Core.AchievementGraphs;
 using Platform.Core.Processing;
 using Platform.DataAccess.Postgress;
+using Platform.Lms;
 
 namespace Platform.Application.Services;
 
 public sealed class StudentAchievementGraphService(
-    PlatformDbContext dbContext,
+    AchievementDbContext dbContext,
+    ILmsDataSource lmsDataSource,
     TimeProvider timeProvider,
     IAchievementGraphTemplateProvider templateProvider,
     IAchievementGraphXmlSerializer serializer,
@@ -89,33 +91,27 @@ public sealed class StudentAchievementGraphService(
         int year,
         CancellationToken cancellationToken)
     {
-        var studentExists = await dbContext.Students
-            .AsNoTracking()
-            .AnyAsync(student => student.Id == studentId, cancellationToken);
+        var studentExists = await lmsDataSource.GetPersonAsync(
+            studentId,
+            cancellationToken) is not null;
 
         if (!studentExists)
             return StudentAchievementGraphAccessStatus.StudentNotFound;
 
-        var courseExists = await dbContext.CourseInstances
-            .AsNoTracking()
-            .AnyAsync(
-                course => course.CourseID == courseId && course.Year == year,
-                cancellationToken);
+        var courseExists = await lmsDataSource.CourseInstanceExistsAsync(
+            courseId,
+            year,
+            cancellationToken);
 
         if (!courseExists)
             return StudentAchievementGraphAccessStatus.CourseNotFound;
 
-        var now = timeProvider.GetUtcNow().UtcDateTime;
-        var hasCourseAccess = await dbContext.CourseInstanceStudents
-            .AsNoTracking()
-            .AnyAsync(
-                item =>
-                    item.PersonID == studentId &&
-                    item.CourseID == courseId &&
-                    item.Year == year &&
-                    item.StartDate <= now &&
-                    (!item.EndDate.HasValue || item.EndDate.Value >= now),
-                cancellationToken);
+        var hasCourseAccess = await lmsDataSource.HasActiveEnrollmentAsync(
+            studentId,
+            courseId,
+            year,
+            timeProvider.GetUtcNow(),
+            cancellationToken);
 
         return hasCourseAccess
             ? StudentAchievementGraphAccessStatus.Success

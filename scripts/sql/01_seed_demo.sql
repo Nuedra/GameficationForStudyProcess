@@ -1,4 +1,4 @@
--- Demo data for local verification after migrations.
+-- Demo data for local verification after the local SQL bootstrap.
 -- Safe to rerun: cleanup by fixed IDs first.
 
 BEGIN;

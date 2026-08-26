@@ -15,6 +15,8 @@ using Platform.Core.Appraisals;
 using Platform.Core.Models;
 using Platform.Core.Processing;
 using Platform.DataAccess.Postgress;
+using Platform.DataAccess.Postgress.Lms;
+using Platform.Lms;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -116,8 +118,11 @@ builder.Services
         "GUID привилегированных пользователей не должны повторяться.")
     .ValidateOnStart();
 builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddDbContext<PlatformDbContext>(options =>
+builder.Services.AddDbContext<AchievementDbContext>(options =>
     options.UseNpgsql(GetConnectionString()));
+builder.Services.AddDbContext<LocalLmsDbContext>(options =>
+    options.UseNpgsql(GetConnectionString()));
+builder.Services.AddScoped<ILmsDataSource, LocalLmsDataSource>();
 builder.Services.AddScoped<IUserIdentityService, UserIdentityService>();
 builder.Services.AddScoped<IStudentCourseService, StudentCourseService>();
 builder.Services.AddScoped<IStudentAchievementGraphService, StudentAchievementGraphService>();
@@ -128,6 +133,7 @@ builder.Services.AddSingleton<IAppraisalFactsExtractor, AppraisalFactsExtractor>
 builder.Services.AddSingleton<IAppraisalPayloadProvider, FixedAppraisalPayloadProvider>();
 builder.Services.AddScoped(serviceProvider => new AchievementProcessingCycle(
     GetConnectionString(),
+    serviceProvider.GetRequiredService<ILmsDataSource>(),
     serviceProvider.GetRequiredService<IAppraisalPayloadProvider>(),
     serviceProvider.GetRequiredService<IAppraisalFactsExtractor>()));
 
@@ -154,7 +160,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapGet("/health/ready", async (
-    PlatformDbContext dbContext,
+    AchievementDbContext dbContext,
     ILogger<Program> logger,
     CancellationToken cancellationToken) =>
 {

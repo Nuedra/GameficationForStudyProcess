@@ -19,9 +19,7 @@ public class Course
         entity.Title,
         entity.Description,
         entity.AuthorEntity,
-        entity.Achievements
-            .Select(a => new Achievement(a))
-            .ToList(),
+        [],
         entity.PreviousID
     )
     {

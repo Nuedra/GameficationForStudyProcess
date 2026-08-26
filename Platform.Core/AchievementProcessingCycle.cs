@@ -1,18 +1,21 @@
 using Microsoft.EntityFrameworkCore;
 using Platform.Core.Appraisals;
 using Platform.DataAccess.Postgress;
+using Platform.Lms;
 
 namespace Platform.Core.Processing;
 
 public sealed class AchievementProcessingCycle
 {
-    private readonly Func<PlatformDbContext> _dbContextFactory;
+    private readonly Func<AchievementDbContext> _dbContextFactory;
+    private readonly ILmsDataSource _lmsDataSource;
     private readonly IAppraisalPayloadProvider _payloadProvider;
     private readonly IAppraisalFactsExtractor _factsExtractor;
     private readonly TimeProvider _timeProvider;
 
     public AchievementProcessingCycle(
         string connectionString,
+        ILmsDataSource lmsDataSource,
         IAppraisalPayloadProvider payloadProvider,
         IAppraisalFactsExtractor factsExtractor,
         TimeProvider? timeProvider = null)
@@ -21,18 +24,21 @@ public sealed class AchievementProcessingCycle
             throw new ArgumentException("Connection string is required.", nameof(connectionString));
 
         _dbContextFactory = () => PlatformDatabase.Connect(connectionString);
+        _lmsDataSource = lmsDataSource ?? throw new ArgumentNullException(nameof(lmsDataSource));
         _payloadProvider = payloadProvider ?? throw new ArgumentNullException(nameof(payloadProvider));
         _factsExtractor = factsExtractor ?? throw new ArgumentNullException(nameof(factsExtractor));
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public AchievementProcessingCycle(
-        Func<PlatformDbContext> dbContextFactory,
+        Func<AchievementDbContext> dbContextFactory,
+        ILmsDataSource lmsDataSource,
         IAppraisalPayloadProvider payloadProvider,
         IAppraisalFactsExtractor factsExtractor,
         TimeProvider? timeProvider = null)
     {
         _dbContextFactory = dbContextFactory ?? throw new ArgumentNullException(nameof(dbContextFactory));
+        _lmsDataSource = lmsDataSource ?? throw new ArgumentNullException(nameof(lmsDataSource));
         _payloadProvider = payloadProvider ?? throw new ArgumentNullException(nameof(payloadProvider));
         _factsExtractor = factsExtractor ?? throw new ArgumentNullException(nameof(factsExtractor));
         _timeProvider = timeProvider ?? TimeProvider.System;
@@ -43,10 +49,10 @@ public sealed class AchievementProcessingCycle
         // подключение к БД
         await using var db = _dbContextFactory();
 
-        // ищет студента и проверяет его наличие
-        var studentExists = await db.Students
-            .AsNoTracking()
-            .AnyAsync(student => student.Id == studentId, cancellationToken);
+        // Сведения о человеке принадлежат LMS, а не базе достижений.
+        var studentExists = await _lmsDataSource.GetPersonAsync(
+            studentId,
+            cancellationToken) is not null;
 
         if (!studentExists)
             throw new InvalidOperationException($"Student with id {studentId} was not found.");

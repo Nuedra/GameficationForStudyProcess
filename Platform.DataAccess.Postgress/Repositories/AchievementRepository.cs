@@ -4,9 +4,9 @@ namespace Platform.DataAccess.Postgress
 {
     public class AchievementRepository
     {
-        private readonly PlatformDbContext _db;
+        private readonly AchievementDbContext _db;
 
-        public AchievementRepository(PlatformDbContext db)
+        public AchievementRepository(AchievementDbContext db)
         {
             _db = db;
         }
@@ -15,10 +15,8 @@ namespace Platform.DataAccess.Postgress
         {
             return _db.Achievements
                 .AsNoTracking()
-                .Include(a => a.Course)
                 .Include(a => a.Criteria)
                 .Include(a => a.StudentAchievements)
-                    .ThenInclude(sa => sa.Student)
                 .FirstOrDefaultAsync(a => a.Id == achievementId);
         }
 
@@ -38,7 +36,6 @@ namespace Platform.DataAccess.Postgress
                 .AsNoTracking()
                 .Where(x => x.StudentID == studentId)
                 .Include(x => x.Achievement)
-                    .ThenInclude(a => a.Course)
                 .OrderByDescending(x => x.AchievementGotDate)
                 .ToListAsync();
         }

@@ -10,8 +10,7 @@ namespace Platform.DataAccess.Postgress
         public string Track { get; set; } = "default";
         public Guid? LabID { get; set; }
         public Guid CourseID { get; set; }
-        public CourseEntity Course { get; set; }
         public List<StudentAchievementEntity> StudentAchievements { get; set; } = [];
-        public AchievementCriteriaEntity Criteria { get; set; }
+        public AchievementCriteriaEntity? Criteria { get; set; }
     }
 }

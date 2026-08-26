@@ -1,32 +1,27 @@
-using Microsoft.EntityFrameworkCore;
 using Platform.Application.Contracts;
-using Platform.DataAccess.Postgress;
+using Platform.Lms;
 
 namespace Platform.Application.Services;
 
 public sealed class StudentCourseService(
-    PlatformDbContext dbContext,
+    ILmsDataSource lmsDataSource,
     TimeProvider timeProvider) : IStudentCourseService
 {
     public async Task<IReadOnlyList<CourseDto>> GetCoursesAsync(
         Guid studentId,
         CancellationToken cancellationToken = default)
     {
-        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var courses = await lmsDataSource.GetActiveCourseInstancesAsync(
+            studentId,
+            timeProvider.GetUtcNow(),
+            cancellationToken);
 
-        return await dbContext.CourseInstanceStudents
-            .AsNoTracking()
-            .Where(enrollment =>
-                enrollment.PersonID == studentId &&
-                enrollment.StartDate <= now &&
-                (!enrollment.EndDate.HasValue || enrollment.EndDate.Value >= now))
-            .OrderByDescending(enrollment => enrollment.Year)
-            .ThenBy(enrollment => enrollment.CourseInstance.Course.Title)
-            .Select(enrollment => new CourseDto(
-                enrollment.CourseID,
-                enrollment.CourseInstance.Course.Title,
-                enrollment.CourseInstance.Course.Description,
-                enrollment.Year))
-            .ToListAsync(cancellationToken);
+        return courses
+            .Select(course => new CourseDto(
+                course.CourseId,
+                course.Name,
+                course.Description ?? string.Empty,
+                course.Year))
+            .ToList();
     }
 }

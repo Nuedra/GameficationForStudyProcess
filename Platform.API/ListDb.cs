@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Platform.DataAccess.Postgress;
+using Platform.DataAccess.Postgress.Lms;
 
 namespace Platform.API;
 
@@ -27,7 +28,10 @@ public sealed class ListDbConnection
 
     public async Task<string> GetUserDataJsonAsync(Guid studentId, CancellationToken cancellationToken = default)
     {
-        await using var db = PlatformDatabase.Connect(_connectionString);
+        var options = new DbContextOptionsBuilder<LocalLmsDbContext>()
+            .UseNpgsql(_connectionString)
+            .Options;
+        await using var db = new LocalLmsDbContext(options);
 
         var student = await db.Students
             .AsNoTracking()

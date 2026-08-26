@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Platform.API", "Platform.AP
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Platform.DataAccess.Postgress", "Platform.DataAccess.Postgress\Platform.DataAccess.Postgress.csproj", "{BEE17082-523C-4C29-B001-1202681B8358}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Platform.Lms", "Platform.Lms\Platform.Lms.csproj", "{E2B54B8A-6E5B-4C0B-9F2E-AB0D8C764D31}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Platform.Core", "Platform.Core\Platform.Core.csproj", "{2A162E53-57DD-4E78-878F-73F58D91D9E9}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Platform.Application", "Platform.Application\Platform.Application.csproj", "{0ABC007E-0F42-475A-8255-75FE62E4520C}"
@@ -49,6 +51,18 @@ Global
 		{BEE17082-523C-4C29-B001-1202681B8358}.Release|x64.Build.0 = Release|Any CPU
 		{BEE17082-523C-4C29-B001-1202681B8358}.Release|x86.ActiveCfg = Release|Any CPU
 		{BEE17082-523C-4C29-B001-1202681B8358}.Release|x86.Build.0 = Release|Any CPU
+		{E2B54B8A-6E5B-4C0B-9F2E-AB0D8C764D31}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E2B54B8A-6E5B-4C0B-9F2E-AB0D8C764D31}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E2B54B8A-6E5B-4C0B-9F2E-AB0D8C764D31}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E2B54B8A-6E5B-4C0B-9F2E-AB0D8C764D31}.Debug|x64.Build.0 = Debug|Any CPU
+		{E2B54B8A-6E5B-4C0B-9F2E-AB0D8C764D31}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{E2B54B8A-6E5B-4C0B-9F2E-AB0D8C764D31}.Debug|x86.Build.0 = Debug|Any CPU
+		{E2B54B8A-6E5B-4C0B-9F2E-AB0D8C764D31}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E2B54B8A-6E5B-4C0B-9F2E-AB0D8C764D31}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E2B54B8A-6E5B-4C0B-9F2E-AB0D8C764D31}.Release|x64.ActiveCfg = Release|Any CPU
+		{E2B54B8A-6E5B-4C0B-9F2E-AB0D8C764D31}.Release|x64.Build.0 = Release|Any CPU
+		{E2B54B8A-6E5B-4C0B-9F2E-AB0D8C764D31}.Release|x86.ActiveCfg = Release|Any CPU
+		{E2B54B8A-6E5B-4C0B-9F2E-AB0D8C764D31}.Release|x86.Build.0 = Release|Any CPU
 		{2A162E53-57DD-4E78-878F-73F58D91D9E9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{2A162E53-57DD-4E78-878F-73F58D91D9E9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2A162E53-57DD-4E78-878F-73F58D91D9E9}.Debug|x64.ActiveCfg = Debug|Any CPU

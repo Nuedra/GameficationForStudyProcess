@@ -2,17 +2,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Platform.DataAccess.Postgress
 {
-
     public static class PlatformDatabase
     {
-
-        public static PlatformDbContext Connect(string connectionString)
+        public static AchievementDbContext Connect(string connectionString)
         {
-            var options = new DbContextOptionsBuilder<PlatformDbContext>()
+            var options = new DbContextOptionsBuilder<AchievementDbContext>()
                 .UseNpgsql(connectionString)
                 .Options;
 
-            return new PlatformDbContext(options);
+            return new AchievementDbContext(options);
         }
     }
 }

@@ -1,5 +1,5 @@
 -- Demo data for the student frontend API.
--- Run after applying EF Core migrations. Safe to rerun.
+-- Run after applying the local SQL bootstrap. Safe to rerun.
 
 BEGIN;
 
@@ -12,7 +12,7 @@ BEGIN
           AND table_name = 'courses'
           AND column_name = 'ContentScopeID'
     ) THEN
-        RAISE EXCEPTION 'Local database schema is outdated: courses.ContentScopeID is missing. Apply EF Core migrations before running 03_seed_student_api.sql.';
+        RAISE EXCEPTION 'Local database schema is outdated: courses.ContentScopeID is missing. Apply scripts/sql/00_create_local_schema.sql before running 03_seed_student_api.sql.';
     END IF;
 END $$;
 

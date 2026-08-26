@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Platform.Core.Appraisals;
 using Platform.Core.Processing;
 using Platform.DataAccess.Postgress;
+using Platform.Lms;
 
 namespace Platform.Core.Tests.Processing;
 
@@ -423,35 +424,24 @@ public sealed class AchievementProcessingCycleTests
     {
         return new AchievementProcessingCycle(
             () => CreateDbContext(databaseName),
+            new TestLmsDataSource(),
             new FixedPayloadProvider(payload),
             new AppraisalFactsExtractor(),
             new FixedTimeProvider(currentTime));
     }
 
-    private static PlatformDbContext CreateDbContext(string databaseName)
+    private static AchievementDbContext CreateDbContext(string databaseName)
     {
-        var options = new DbContextOptionsBuilder<PlatformDbContext>()
+        var options = new DbContextOptionsBuilder<AchievementDbContext>()
             .UseInMemoryDatabase(databaseName)
             .Options;
 
-        return new PlatformDbContext(options);
+        return new AchievementDbContext(options);
     }
 
     private static async Task SeedDatabase(string databaseName, AchievementEntity achievement)
     {
         await using var db = CreateDbContext(databaseName);
-        db.Students.Add(new StudentEntity
-        {
-            Id = StudentId,
-            Name = "Ivan",
-            Surname = "Petrov",
-            Group = "IS-101"
-        });
-        db.Courses.Add(new CourseEntity
-        {
-            Id = CourseId,
-            Title = "Course"
-        });
         db.Achievements.Add(achievement);
         await db.SaveChangesAsync();
     }
@@ -499,6 +489,46 @@ public sealed class AchievementProcessingCycleTests
         {
             return Task.FromResult<IReadOnlyList<AppraisalPayloadDto>>([payload]);
         }
+    }
+
+    private sealed class TestLmsDataSource : ILmsDataSource
+    {
+        public Task<LmsPerson?> GetPersonAsync(
+            Guid personId,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return Task.FromResult<LmsPerson?>(personId == StudentId
+                ? new LmsPerson(
+                    StudentId,
+                    "Ivan",
+                    MiddleName: null,
+                    "Petrov",
+                    "IS-101")
+                : null);
+        }
+
+        public Task<bool> CourseInstanceExistsAsync(
+            Guid courseId,
+            int year,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(courseId == CourseId && year == 2026);
+
+        public Task<bool> HasActiveEnrollmentAsync(
+            Guid personId,
+            Guid courseId,
+            int year,
+            DateTimeOffset effectiveAt,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(
+                personId == StudentId && courseId == CourseId && year == 2026);
+
+        public Task<IReadOnlyList<LmsCourseInstance>> GetActiveCourseInstancesAsync(
+            Guid personId,
+            DateTimeOffset effectiveAt,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<LmsCourseInstance>>([]);
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset currentTime) : TimeProvider
