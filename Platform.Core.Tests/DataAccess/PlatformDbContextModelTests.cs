@@ -1,14 +1,35 @@
 using Microsoft.EntityFrameworkCore;
 using Platform.DataAccess.Postgress;
+using Platform.DataAccess.Postgress.Lms;
 
 namespace Platform.Core.Tests.DataAccess;
 
 public sealed class PlatformDbContextModelTests
 {
     [Fact]
+    public void AchievementContext_ContainsOnlyAchievementEntities()
+    {
+        using var dbContext = CreateAchievementDbContext();
+
+        Assert.NotNull(dbContext.Model.FindEntityType(typeof(AchievementEntity)));
+        Assert.Null(dbContext.Model.FindEntityType(typeof(StudentEntity)));
+        Assert.Null(dbContext.Model.FindEntityType(typeof(CourseEntity)));
+    }
+
+    [Fact]
+    public void LocalLmsContext_DoesNotContainAchievementEntities()
+    {
+        using var dbContext = CreateLocalLmsDbContext();
+
+        Assert.NotNull(dbContext.Model.FindEntityType(typeof(StudentEntity)));
+        Assert.NotNull(dbContext.Model.FindEntityType(typeof(CourseEntity)));
+        Assert.Null(dbContext.Model.FindEntityType(typeof(AchievementEntity)));
+    }
+
+    [Fact]
     public void AchievementRarity_IsStoredAsLowercaseStringWithCommonDefault()
     {
-        using var dbContext = CreateDbContext();
+        using var dbContext = CreateAchievementDbContext();
         var entity = dbContext.Model.FindEntityType(typeof(AchievementEntity));
         var rarity = entity!.FindProperty(nameof(AchievementEntity.Rarity))!;
         var converter = rarity.GetValueConverter()!;
@@ -22,7 +43,7 @@ public sealed class PlatformDbContextModelTests
     [Fact]
     public void CourseInstance_UsesCourseAndYearAsCompositeKey()
     {
-        using var dbContext = CreateDbContext();
+        using var dbContext = CreateLocalLmsDbContext();
         var entity = dbContext.Model.FindEntityType(typeof(CourseInstanceEntity));
 
         var keyProperties = entity!.FindPrimaryKey()!
@@ -37,7 +58,7 @@ public sealed class PlatformDbContextModelTests
     [Fact]
     public void CourseInstanceStudent_ReferencesCourseInstanceAndStudent()
     {
-        using var dbContext = CreateDbContext();
+        using var dbContext = CreateLocalLmsDbContext();
         var entity = dbContext.Model.FindEntityType(typeof(CourseInstanceStudentEntity));
 
         var keyProperties = entity!.FindPrimaryKey()!
@@ -63,7 +84,7 @@ public sealed class PlatformDbContextModelTests
     [Fact]
     public void GroupStudent_UsesMembershipPeriodInCompositeKey()
     {
-        using var dbContext = CreateDbContext();
+        using var dbContext = CreateLocalLmsDbContext();
         var entity = dbContext.Model.FindEntityType(typeof(GroupStudentEntity));
 
         var keyProperties = entity!.FindPrimaryKey()!
@@ -82,7 +103,7 @@ public sealed class PlatformDbContextModelTests
     [Fact]
     public async Task CourseAndGroupMemberships_CanBeLoadedThroughNavigations()
     {
-        await using var dbContext = CreateDbContext();
+        await using var dbContext = CreateLocalLmsDbContext();
         var student = new StudentEntity
         {
             Id = Guid.NewGuid(),
@@ -143,12 +164,21 @@ public sealed class PlatformDbContextModelTests
         Assert.Single(loadedStudent.GroupMemberships);
     }
 
-    private static PlatformDbContext CreateDbContext()
+    private static AchievementDbContext CreateAchievementDbContext()
     {
-        var options = new DbContextOptionsBuilder<PlatformDbContext>()
+        var options = new DbContextOptionsBuilder<AchievementDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
 
-        return new PlatformDbContext(options);
+        return new AchievementDbContext(options);
+    }
+
+    private static LocalLmsDbContext CreateLocalLmsDbContext()
+    {
+        var options = new DbContextOptionsBuilder<LocalLmsDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        return new LocalLmsDbContext(options);
     }
 }

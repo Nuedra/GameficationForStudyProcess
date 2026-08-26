@@ -7,7 +7,7 @@ namespace Platform.DataAccess.Postgress.Lms;
 /// Временная реализация контракта LMS поверх существующей локальной схемы.
 /// После появления LMS заменяется адаптером без изменения прикладных сервисов.
 /// </summary>
-public sealed class LocalLmsDataSource(PlatformDbContext dbContext) : ILmsDataSource
+public sealed class LocalLmsDataSource(LocalLmsDbContext dbContext) : ILmsDataSource
 {
     public Task<LmsPerson?> GetPersonAsync(
         Guid personId,

@@ -118,7 +118,9 @@ builder.Services
         "GUID привилегированных пользователей не должны повторяться.")
     .ValidateOnStart();
 builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddDbContext<PlatformDbContext>(options =>
+builder.Services.AddDbContext<AchievementDbContext>(options =>
+    options.UseNpgsql(GetConnectionString()));
+builder.Services.AddDbContext<LocalLmsDbContext>(options =>
     options.UseNpgsql(GetConnectionString()));
 builder.Services.AddScoped<ILmsDataSource, LocalLmsDataSource>();
 builder.Services.AddScoped<IUserIdentityService, UserIdentityService>();
@@ -158,7 +160,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapGet("/health/ready", async (
-    PlatformDbContext dbContext,
+    AchievementDbContext dbContext,
     ILogger<Program> logger,
     CancellationToken cancellationToken) =>
 {

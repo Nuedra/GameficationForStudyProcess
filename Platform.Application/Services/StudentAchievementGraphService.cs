@@ -7,7 +7,7 @@ using Platform.Lms;
 namespace Platform.Application.Services;
 
 public sealed class StudentAchievementGraphService(
-    PlatformDbContext dbContext,
+    AchievementDbContext dbContext,
     ILmsDataSource lmsDataSource,
     TimeProvider timeProvider,
     IAchievementGraphTemplateProvider templateProvider,

@@ -13,9 +13,6 @@ namespace Platform.Core.Models
             entity.Track,
             entity.LabID,
             entity.CourseID,
-            entity.Course != null
-                ? new Course(entity.Course)
-                : null!,
             entity.StudentAchievements
                 .Select(sa => new StudentAchievement(sa))
                 .ToList(),
@@ -27,7 +24,7 @@ namespace Platform.Core.Models
         }
         private Achievement(Guid id, string title, string description, int year,
         Platform.DataAccess.Postgress.AchievementRarity rarity, string track, Guid? labID,
-        Guid courseID, Course course, List<StudentAchievement> studentAchievements, AchievementCriteria criteria)
+        Guid courseID, List<StudentAchievement> studentAchievements, AchievementCriteria criteria)
         {
             Id = id;
             Title = title;
@@ -37,7 +34,6 @@ namespace Platform.Core.Models
             Track = track;
             LabID = labID;
             CourseID = courseID;
-            Course = course;
             StudentAchievements = studentAchievements;
             Criteria = criteria;
         }
@@ -50,7 +46,6 @@ namespace Platform.Core.Models
         public string Track { get; } = "default";
         public Guid? LabID { get; }
         public Guid CourseID { get; }
-        public Course Course { get; }
         public List<StudentAchievement> StudentAchievements { get;} = [];
         public AchievementCriteria Criteria { get; }
     }

@@ -257,7 +257,7 @@ public sealed class StudentApiTests(StudentApiFactory factory)
         Assert.Equal(HttpStatusCode.OK, repeatedResponse.StatusCode);
 
         using var scope = factory.Services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AchievementDbContext>();
         var assignedCount = await dbContext.StudentAchievements.CountAsync(item =>
             item.StudentID == StudentApiFactory.StudentId &&
             item.AchievementID == StudentApiFactory.LockedAchievementId);

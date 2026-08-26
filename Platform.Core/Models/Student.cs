@@ -18,9 +18,7 @@ public class Student
         entity.Name,
         entity.Surname,
         entity.Group,
-        entity.StudentAchievements
-            .Select(sa => new StudentAchievement(sa))
-            .ToList()
+        []
     )
     {
     }

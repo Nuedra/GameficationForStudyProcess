@@ -430,30 +430,18 @@ public sealed class AchievementProcessingCycleTests
             new FixedTimeProvider(currentTime));
     }
 
-    private static PlatformDbContext CreateDbContext(string databaseName)
+    private static AchievementDbContext CreateDbContext(string databaseName)
     {
-        var options = new DbContextOptionsBuilder<PlatformDbContext>()
+        var options = new DbContextOptionsBuilder<AchievementDbContext>()
             .UseInMemoryDatabase(databaseName)
             .Options;
 
-        return new PlatformDbContext(options);
+        return new AchievementDbContext(options);
     }
 
     private static async Task SeedDatabase(string databaseName, AchievementEntity achievement)
     {
         await using var db = CreateDbContext(databaseName);
-        db.Students.Add(new StudentEntity
-        {
-            Id = StudentId,
-            Name = "Ivan",
-            Surname = "Petrov",
-            Group = "IS-101"
-        });
-        db.Courses.Add(new CourseEntity
-        {
-            Id = CourseId,
-            Title = "Course"
-        });
         db.Achievements.Add(achievement);
         await db.SaveChangesAsync();
     }

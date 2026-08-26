@@ -1,8 +1,8 @@
 namespace Platform.Core.Models;
 public class StudentAchievement
 {
-    private StudentAchievement(Guid id, DateTime achievementGotDate, DateTime achievementFoundDate, bool isNotificationSeen, 
-    bool isFirstAnimationShown, Guid? labID, Guid achievementID, Achievement achievement, Guid studentID, Student student)
+    private StudentAchievement(Guid id, DateTime achievementGotDate, DateTime achievementFoundDate, bool isNotificationSeen,
+    bool isFirstAnimationShown, Guid? labID, Guid achievementID, Achievement achievement, Guid studentID)
     {
         Id = id;
         AchievementGotDate = achievementGotDate;
@@ -13,7 +13,6 @@ public class StudentAchievement
         AchievementID = achievementID;
         Achievement = achievement;
         StudentID = studentID;
-        Student = student;
     }
 
     public StudentAchievement(Platform.DataAccess.Postgress.StudentAchievementEntity entity)
@@ -28,10 +27,7 @@ public class StudentAchievement
         entity.Achievement != null
             ? new Achievement(entity.Achievement)
             : null!,
-        entity.StudentID,
-        entity.Student != null
-            ? new Student(entity.Student)
-            : null!
+        entity.StudentID
     )
     {
     }
@@ -45,6 +41,5 @@ public class StudentAchievement
     public Guid AchievementID { get;}
     public Achievement Achievement { get;}
     public Guid StudentID { get;}
-    public Student Student { get;}
 
 }

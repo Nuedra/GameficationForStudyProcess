@@ -7,7 +7,7 @@ namespace Platform.Core.Processing;
 
 public sealed class AchievementProcessingCycle
 {
-    private readonly Func<PlatformDbContext> _dbContextFactory;
+    private readonly Func<AchievementDbContext> _dbContextFactory;
     private readonly ILmsDataSource _lmsDataSource;
     private readonly IAppraisalPayloadProvider _payloadProvider;
     private readonly IAppraisalFactsExtractor _factsExtractor;
@@ -31,7 +31,7 @@ public sealed class AchievementProcessingCycle
     }
 
     public AchievementProcessingCycle(
-        Func<PlatformDbContext> dbContextFactory,
+        Func<AchievementDbContext> dbContextFactory,
         ILmsDataSource lmsDataSource,
         IAppraisalPayloadProvider payloadProvider,
         IAppraisalFactsExtractor factsExtractor,

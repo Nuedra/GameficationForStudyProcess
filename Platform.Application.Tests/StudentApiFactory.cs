@@ -8,6 +8,7 @@ using Platform.Application.Services;
 using Platform.Core.Appraisals;
 using Platform.Core.Processing;
 using Platform.DataAccess.Postgress;
+using Platform.DataAccess.Postgress.Lms;
 using Platform.Lms;
 
 namespace Platform.Application.Tests;
@@ -51,12 +52,16 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
             }));
         builder.ConfigureServices(services =>
         {
-            services.RemoveAll<DbContextOptions<PlatformDbContext>>();
-            services.RemoveAll<PlatformDbContext>();
+            services.RemoveAll<DbContextOptions<AchievementDbContext>>();
+            services.RemoveAll<AchievementDbContext>();
+            services.RemoveAll<DbContextOptions<LocalLmsDbContext>>();
+            services.RemoveAll<LocalLmsDbContext>();
             services.RemoveAll<IAchievementGraphTemplateProvider>();
             services.RemoveAll<IAppraisalPayloadProvider>();
             services.RemoveAll<AchievementProcessingCycle>();
-            services.AddDbContext<PlatformDbContext>(options =>
+            services.AddDbContext<AchievementDbContext>(options =>
+                options.UseInMemoryDatabase(_databaseName));
+            services.AddDbContext<LocalLmsDbContext>(options =>
                 options.UseInMemoryDatabase(_databaseName));
             services.AddSingleton<IAchievementGraphTemplateProvider>(
                 new TestAchievementGraphTemplateProvider());
@@ -65,10 +70,10 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
             services.AddScoped(serviceProvider =>
             {
                 var options = serviceProvider
-                    .GetRequiredService<DbContextOptions<PlatformDbContext>>();
+                    .GetRequiredService<DbContextOptions<AchievementDbContext>>();
 
                 return new AchievementProcessingCycle(
-                    () => new PlatformDbContext(options),
+                    () => new AchievementDbContext(options),
                     serviceProvider.GetRequiredService<ILmsDataSource>(),
                     serviceProvider.GetRequiredService<IAppraisalPayloadProvider>(),
                     serviceProvider.GetRequiredService<IAppraisalFactsExtractor>(),
@@ -77,9 +82,13 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
 
             using var serviceProvider = services.BuildServiceProvider();
             using var scope = serviceProvider.CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
-            dbContext.Database.EnsureCreated();
-            Seed(dbContext);
+            var achievementDbContext = scope.ServiceProvider
+                .GetRequiredService<AchievementDbContext>();
+            var lmsDbContext = scope.ServiceProvider
+                .GetRequiredService<LocalLmsDbContext>();
+            achievementDbContext.Database.EnsureCreated();
+            lmsDbContext.Database.EnsureCreated();
+            Seed(achievementDbContext, lmsDbContext);
         });
     }
 
@@ -88,17 +97,23 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
         lock (_databaseLock)
         {
             using var scope = Services.CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+            var achievementDbContext = scope.ServiceProvider
+                .GetRequiredService<AchievementDbContext>();
+            var lmsDbContext = scope.ServiceProvider
+                .GetRequiredService<LocalLmsDbContext>();
 
-            dbContext.Database.EnsureDeleted();
-            dbContext.Database.EnsureCreated();
-            Seed(dbContext);
+            achievementDbContext.Database.EnsureDeleted();
+            achievementDbContext.Database.EnsureCreated();
+            lmsDbContext.Database.EnsureCreated();
+            Seed(achievementDbContext, lmsDbContext);
         }
     }
 
-    private static void Seed(PlatformDbContext dbContext)
+    private static void Seed(
+        AchievementDbContext achievementDbContext,
+        LocalLmsDbContext lmsDbContext)
     {
-        if (dbContext.Students.Any())
+        if (lmsDbContext.Students.Any())
             return;
 
         var student = new StudentEntity
@@ -132,7 +147,6 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
         var courseInstance = new CourseInstanceEntity
         {
             CourseID = CourseId,
-            Course = course,
             Year = 2026,
             ContentScopeID = Guid.NewGuid(),
             CreatedAt = DateTime.UtcNow
@@ -140,7 +154,6 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
         var otherCourseInstance = new CourseInstanceEntity
         {
             CourseID = OtherCourseId,
-            Course = otherCourse,
             Year = 2026,
             ContentScopeID = Guid.NewGuid(),
             CreatedAt = DateTime.UtcNow
@@ -151,7 +164,6 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
             Title = "Первый коммит",
             Description = "Полученная ачивка",
             CourseID = CourseId,
-            Course = course,
             Year = 2026
         };
         var lockedAchievement = new AchievementEntity
@@ -160,7 +172,6 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
             Title = "Полпути пройдено!",
             Description = "Ещё не полученная ачивка",
             CourseID = CourseId,
-            Course = course,
             Year = 2026
         };
         var lockedCriteria = new AchievementCriteriaEntity
@@ -174,16 +185,13 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
         };
         lockedAchievement.Criteria = lockedCriteria;
 
-        dbContext.AddRange(
+        lmsDbContext.AddRange(
             student,
             otherStudent,
             course,
             otherCourse,
             courseInstance,
             otherCourseInstance,
-            earnedAchievement,
-            lockedAchievement,
-            lockedCriteria,
             new CourseInstanceStudentEntity
             {
                 CourseID = CourseId,
@@ -201,12 +209,18 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
                 Student = otherStudent,
                 CourseInstance = otherCourseInstance,
                 StartDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
-            },
+            });
+
+        lmsDbContext.SaveChanges();
+
+        achievementDbContext.AddRange(
+            earnedAchievement,
+            lockedAchievement,
+            lockedCriteria,
             new StudentAchievementEntity
             {
                 Id = Guid.NewGuid(),
                 StudentID = StudentId,
-                Student = student,
                 AchievementID = EarnedAchievementId,
                 Achievement = earnedAchievement,
                 AchievementGotDate =
@@ -223,7 +237,7 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
                 Target = lockedAchievement
             });
 
-        dbContext.SaveChanges();
+        achievementDbContext.SaveChanges();
     }
 
     private sealed class TestAchievementGraphTemplateProvider : IAchievementGraphTemplateProvider
