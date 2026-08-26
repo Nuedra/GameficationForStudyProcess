@@ -1,7 +1,6 @@
 @page "/login"
 @inject IJSRuntime JsRuntime
 @inject NavigationManager Navigation
-@inject IUserContextService UserContextService
 
 <PageTitle>Вход — Платформа достижений</PageTitle>
 
@@ -12,13 +11,13 @@
                 <div class="text-center mb-4">
                     <div class="login-icon mb-2">🎓</div>
                     <h2 class="card-title mb-1">Платформа достижений</h2>
-                    <p class="text-muted small mb-0">Введите ваш студенческий ID для входа</p>
+                    <p class="text-muted small mb-0">Введите выданный вам ID пользователя</p>
                 </div>
 
                 <div class="mb-3">
-                    <label for="studentId" class="form-label">ID студента</label>
+                    <label for="userId" class="form-label">ID пользователя</label>
                     <input type="text"
-                           id="studentId"
+                           id="userId"
                            class="form-control @(_error != null ? "is-invalid" : "")"
                            @bind="_studentId"
                            @bind:event="oninput"
@@ -45,7 +44,9 @@
                 </button>
 
                 <p class="text-muted text-center mt-3 small mb-0">
-                    Тестовый ID: <code>b0000000-0000-0000-0000-000000000001</code>
+                    Студент: <code>b0000000-0000-0000-0000-000000000001</code><br />
+                    Преподаватель: <code>b1000000-0000-0000-0000-000000000001</code><br />
+                    Администратор: <code>b2000000-0000-0000-0000-000000000001</code>
                 </p>
             </div>
         </div>
@@ -85,10 +86,7 @@
                 return;
             }
 
-            if (result.Student?.Id is Guid studentId)
-                UserContextService.SetCurrentUserId(studentId);
-
-            Navigation.NavigateTo("/");
+            Navigation.NavigateTo("/", forceLoad: true);
         }
         catch
         {
@@ -105,13 +103,14 @@
         public bool Success { get; set; }
         public int Status { get; set; }
         public string? Message { get; set; }
-        public StudentInfo? Student { get; set; }
+        public UserInfo? User { get; set; }
     }
 
-    private sealed class StudentInfo
+    private sealed class UserInfo
     {
-        public Guid? Id { get; set; }
-        public string FullName { get; set; } = "";
-        public string Group { get; set; } = "";
+        public Guid Id { get; set; }
+        public string DisplayName { get; set; } = "";
+        public string Role { get; set; } = "";
+        public string? Group { get; set; }
     }
 }

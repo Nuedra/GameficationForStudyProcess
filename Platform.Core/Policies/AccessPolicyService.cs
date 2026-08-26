@@ -17,6 +17,13 @@ public sealed class AccessPolicyService : IAccessPolicyService
                 Permission.ViewOwnAchievements,
                 Permission.ManageCourses,
                 Permission.EditAchievementCriteria
+            },
+            [UserRole.Administrator] = new HashSet<Permission>
+            {
+                Permission.ViewOwnAchievements,
+                Permission.ManageCourses,
+                Permission.EditAchievementCriteria,
+                Permission.ManageUsers
             }
         };
 

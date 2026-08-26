@@ -1,4 +1,5 @@
 @page "/achievements"
+@attribute [Authorize(Roles = "student")]
 @inject IJSRuntime JsRuntime
 
 <PageTitle>Достижения — Платформа достижений</PageTitle>
@@ -118,7 +119,7 @@ else
 
         try
         {
-            var session = await JsRuntime.InvokeAsync<SessionResult>("platformApi.getCurrentStudent");
+            var session = await JsRuntime.InvokeAsync<SessionResult>("platformApi.getCurrentUser");
             _isAuthenticated = session.Success;
 
             if (!session.Success)

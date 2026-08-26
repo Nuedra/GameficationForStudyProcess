@@ -32,11 +32,14 @@
             const baseUrl = `/api/student/courses/${courseId}/${year}/achievements/graph`;
             const url = useRefresh ? `${baseUrl}/refresh` : baseUrl;
 
-            const response = await fetch(url, {
+            const requestOptions = {
                 method: useRefresh ? 'POST' : 'GET',
                 credentials: "include",
                 headers: { Accept: "application/xml" }
-            });
+            };
+            const response = useRefresh
+                ? await window.platformApi.protectedFetch(url, requestOptions)
+                : await fetch(url, requestOptions);
 
             if (!response.ok) {
                 container.textContent = "";

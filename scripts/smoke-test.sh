@@ -19,6 +19,8 @@ response_body="$temporary_directory/response-body"
 application_log="$temporary_directory/application.log"
 student_cookie="$temporary_directory/student-cookie.txt"
 restricted_student_cookie="$temporary_directory/restricted-student-cookie.txt"
+teacher_cookie="$temporary_directory/teacher-cookie.txt"
+administrator_cookie="$temporary_directory/administrator-cookie.txt"
 application_pid=""
 base_url="http://localhost:5284"
 
@@ -70,6 +72,22 @@ expect_body_contains() {
         fail "response does not contain: $expected_text"
 }
 
+get_csrf_token() {
+    local cookie_file="$1"
+    if [[ ! -f "$cookie_file" ]]; then
+        : > "$cookie_file"
+    fi
+    expect_status 200 \
+        --cookie "$cookie_file" \
+        --cookie-jar "$cookie_file" \
+        "$base_url/api/auth/csrf"
+
+    local token
+    token="$(sed -n 's/.*"token":"\([^"]*\)".*/\1/p' "$response_body")"
+    [[ -n "$token" ]] || fail "CSRF response does not contain a token"
+    printf '%s' "$token"
+}
+
 expect_node_state() {
     local achievement_id="$1"
     local expected_state="$2"
@@ -112,6 +130,8 @@ wait_for_readiness
 
 student_id="b0000000-0000-0000-0000-000000000001"
 restricted_student_id="b0000000-0000-0000-0000-000000000006"
+teacher_id="b1000000-0000-0000-0000-000000000001"
+administrator_id="b2000000-0000-0000-0000-000000000001"
 course_id="a1000000-0000-0000-0000-000000000001"
 foreign_course_id="a1000000-0000-0000-0000-000000000002"
 missing_course_id="a1000000-0000-0000-0000-000000000099"
@@ -122,16 +142,27 @@ expect_status 401 "$base_url/api/auth/me"
 expect_status 401 "$base_url/api/student/courses"
 expect_status 400 \
     --header "Content-Type: application/json" \
+    --data "{\"id\":\"$student_id\"}" \
+    "$base_url/api/auth/login"
+student_csrf_token="$(get_csrf_token "$student_cookie")"
+expect_status 400 \
+    --header "Content-Type: application/json" \
+    --header "X-CSRF-TOKEN: $student_csrf_token" \
+    --cookie "$student_cookie" \
     --data '{"id":"00000000-0000-0000-0000-000000000000"}' \
-    "$base_url/api/auth/student/login"
+    "$base_url/api/auth/login"
 
 echo "Checking the authenticated student flow..."
 expect_status 200 \
+    --cookie "$student_cookie" \
     --cookie-jar "$student_cookie" \
     --header "Content-Type: application/json" \
+    --header "X-CSRF-TOKEN: $student_csrf_token" \
     --data "{\"id\":\"$student_id\"}" \
-    "$base_url/api/auth/student/login"
+    "$base_url/api/auth/login"
 expect_body_contains "$student_id"
+
+student_csrf_token="$(get_csrf_token "$student_cookie")"
 
 expect_status 200 --cookie "$student_cookie" "$base_url/api/auth/me"
 expect_body_contains "$student_id"
@@ -148,6 +179,7 @@ expect_node_state "$achievement_three_id" "available"
 expect_status 200 \
     --cookie "$student_cookie" \
     --header "Accept: application/xml" \
+    --header "X-CSRF-TOKEN: $student_csrf_token" \
     --request POST \
     "$base_url/api/student/courses/$course_id/2026/achievements/graph/refresh"
 expect_node_state "$achievement_three_id" "earned"
@@ -155,6 +187,7 @@ expect_node_state "$achievement_three_id" "earned"
 expect_status 200 \
     --cookie "$student_cookie" \
     --header "Accept: application/xml" \
+    --header "X-CSRF-TOKEN: $student_csrf_token" \
     --request POST \
     "$base_url/api/student/courses/$course_id/2026/achievements/graph/refresh"
 expect_node_state "$achievement_three_id" "earned"
@@ -167,18 +200,44 @@ expect_status 404 \
 expect_status 204 \
     --cookie "$student_cookie" \
     --cookie-jar "$student_cookie" \
+    --header "X-CSRF-TOKEN: $student_csrf_token" \
     --request POST \
     "$base_url/api/auth/logout"
 expect_status 401 --cookie "$student_cookie" "$base_url/api/auth/me"
 
 expect_status 200 \
+    --cookie "$restricted_student_cookie" \
     --cookie-jar "$restricted_student_cookie" \
     --header "Content-Type: application/json" \
+    --header "X-CSRF-TOKEN: $(get_csrf_token "$restricted_student_cookie")" \
     --data "{\"id\":\"$restricted_student_id\"}" \
-    "$base_url/api/auth/student/login"
+    "$base_url/api/auth/login"
 expect_status 403 \
     --cookie "$restricted_student_cookie" \
     "$base_url/api/student/courses/$foreign_course_id/2026/achievements/graph"
+
+echo "Checking teacher and administrator roles..."
+expect_status 200 \
+    --cookie "$teacher_cookie" \
+    --cookie-jar "$teacher_cookie" \
+    --header "Content-Type: application/json" \
+    --header "X-CSRF-TOKEN: $(get_csrf_token "$teacher_cookie")" \
+    --data "{\"id\":\"$teacher_id\"}" \
+    "$base_url/api/auth/login"
+expect_body_contains '"role":"teacher"'
+expect_status 403 --cookie "$teacher_cookie" "$base_url/api/student/courses"
+expect_body_contains '"code":"access_denied"'
+
+expect_status 200 \
+    --cookie "$administrator_cookie" \
+    --cookie-jar "$administrator_cookie" \
+    --header "Content-Type: application/json" \
+    --header "X-CSRF-TOKEN: $(get_csrf_token "$administrator_cookie")" \
+    --data "{\"id\":\"$administrator_id\"}" \
+    "$base_url/api/auth/login"
+expect_body_contains '"role":"administrator"'
+expect_status 200 --cookie "$administrator_cookie" "$base_url/api/auth/session"
+expect_body_contains '"sessionId"'
 
 echo "Checking that the Vue graph component accepts XML..."
 npm ci --prefix "Graph.Component"

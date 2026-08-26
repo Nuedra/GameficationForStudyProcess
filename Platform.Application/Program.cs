@@ -1,15 +1,18 @@
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using Platform.Application.Authentication;
 using Platform.Application.Contracts;
 using Platform.Application.Middleware;
 using Platform.Application.Services;
 using Platform.Application.Swagger;
 using Platform.Core.AchievementGraphs;
 using Platform.Core.Appraisals;
+using Platform.Core.Models;
 using Platform.Core.Processing;
 using Platform.DataAccess.Postgress;
 
@@ -38,12 +41,12 @@ builder.Services.AddSwaggerGen(options =>
         Version = "v1",
         Description = "API для Blazor-клиента платформы учебных ачивок."
     });
-    options.AddSecurityDefinition("studentCookie", new OpenApiSecurityScheme
+    options.AddSecurityDefinition("authenticationCookie", new OpenApiSecurityScheme
     {
         Type = SecuritySchemeType.ApiKey,
         In = ParameterLocation.Cookie,
-        Name = "Platform.Student",
-        Description = "Cookie создаётся запросом POST /api/auth/student/login."
+        Name = "Platform.Auth",
+        Description = "Cookie создаётся запросом POST /api/auth/login."
     });
 
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
@@ -52,9 +55,11 @@ builder.Services.AddSwaggerGen(options =>
         options.IncludeXmlComments(xmlPath);
 
     options.OperationFilter<AchievementGraphXmlExampleFilter>();
+    options.OperationFilter<AntiforgeryHeaderOperationFilter>();
 });
 builder.Services
-    .AddControllers()
+    .AddControllers(options =>
+        options.Filters.Add(new AutoValidateAntiforgeryTokenAttribute()))
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
@@ -65,29 +70,55 @@ builder.Services
     .AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
-        options.Cookie.Name = "Platform.Student";
+        options.Cookie.Name = "Platform.Auth";
         options.Cookie.HttpOnly = true;
-        options.Cookie.SameSite = SameSiteMode.Lax;
-        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
-        options.ExpireTimeSpan = TimeSpan.FromDays(14);
+        options.Cookie.IsEssential = true;
+        options.Cookie.SameSite = SameSiteMode.Strict;
+        options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+            ? CookieSecurePolicy.SameAsRequest
+            : CookieSecurePolicy.Always;
+        options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.SlidingExpiration = true;
-        options.Events.OnRedirectToLogin = context =>
-        {
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            return context.Response.WriteAsJsonAsync(ApiErrors.AuthenticationRequired);
-        };
-        options.Events.OnRedirectToAccessDenied = context =>
-        {
-            context.Response.StatusCode = StatusCodes.Status403Forbidden;
-            return context.Response.WriteAsJsonAsync(ApiErrors.CourseAccessDenied);
-        };
+        options.EventsType = typeof(PlatformCookieAuthenticationEvents);
     });
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-CSRF-TOKEN";
+    options.Cookie.Name = "Platform.Antiforgery";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+    options.Cookie.SameSite = SameSiteMode.Strict;
+    options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+        ? CookieSecurePolicy.SameAsRequest
+        : CookieSecurePolicy.Always;
+});
 builder.Services.AddAuthorization();
+builder.Services.AddScoped<PlatformCookieAuthenticationEvents>();
+builder.Services.AddSingleton<InMemoryAuthenticationTicketStore>();
+builder.Services
+    .AddOptions<CookieAuthenticationOptions>(CookieAuthenticationDefaults.AuthenticationScheme)
+    .Configure<InMemoryAuthenticationTicketStore>((options, ticketStore) =>
+        options.SessionStore = ticketStore);
+builder.Services
+    .AddOptions<GuidAuthenticationOptions>()
+    .BindConfiguration(GuidAuthenticationOptions.SectionName)
+    .Validate(
+        options => options.PrivilegedUsers.All(user =>
+            user.Id != Guid.Empty &&
+            !string.IsNullOrWhiteSpace(user.DisplayName) &&
+            user.Role is UserRole.Teacher or UserRole.Administrator),
+        "Привилегированные GUID-пользователи должны иметь ID, имя и роль teacher или administrator.")
+    .Validate(
+        options => options.PrivilegedUsers
+            .Select(user => user.Id)
+            .Distinct()
+            .Count() == options.PrivilegedUsers.Count,
+        "GUID привилегированных пользователей не должны повторяться.")
+    .ValidateOnStart();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddDbContext<PlatformDbContext>(options =>
     options.UseNpgsql(GetConnectionString()));
-builder.Services.AddScoped<IUserContextService, UserContextService>();
-builder.Services.AddScoped<IStudentIdentityService, StudentIdentityService>();
+builder.Services.AddScoped<IUserIdentityService, UserIdentityService>();
 builder.Services.AddScoped<IStudentCourseService, StudentCourseService>();
 builder.Services.AddScoped<IStudentAchievementGraphService, StudentAchievementGraphService>();
 builder.Services.AddSingleton<IAchievementGraphTemplateProvider, FileAchievementGraphTemplateProvider>();
