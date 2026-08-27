@@ -34,6 +34,33 @@ public sealed class AchievementManagementController(
             : ToErrorResult(result.Status);
     }
 
+    [HttpGet("audit")]
+    [ProducesResponseType(typeof(IReadOnlyList<AchievementAwardAuditEventDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<AchievementAwardAuditEventDto>>> GetAwardAudit(
+        Guid courseId,
+        int year,
+        [FromQuery] Guid? achievementId,
+        [FromQuery] Guid? studentId,
+        [FromQuery] int limit = 100,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryGetIdentity(out var userId, out var roleResult))
+            return Unauthorized(ApiErrors.AuthenticationRequired);
+
+        var result = await achievementManagementService.GetAwardAuditAsync(
+            userId,
+            roleResult,
+            courseId,
+            year,
+            achievementId,
+            studentId,
+            limit,
+            cancellationToken);
+        return result.Status == AchievementManagementStatus.Success
+            ? Ok(result.AuditEvents)
+            : ToErrorResult(result.Status);
+    }
+
     [HttpPost]
     [ProducesResponseType(typeof(ManagedAchievementDto), StatusCodes.Status201Created)]
     public async Task<ActionResult<ManagedAchievementDto>> Create(

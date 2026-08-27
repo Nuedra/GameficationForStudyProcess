@@ -25,6 +25,9 @@ FROM (
     SELECT generate_series(52, 55) AS number
 ) AS template_ids;
 
+DELETE FROM "achievement_award_audit_events"
+WHERE "AchievementID" IN (SELECT "Id" FROM seed_achievement_ids);
+
 DELETE FROM "achievement_connections"
 WHERE "SourceId" IN (SELECT "Id" FROM seed_achievement_ids)
    OR "TargetId" IN (SELECT "Id" FROM seed_achievement_ids);

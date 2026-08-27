@@ -151,3 +151,32 @@ CREATE INDEX IF NOT EXISTS "IX_student_achievements_LabID"
     ON "student_achievements" ("LabID");
 CREATE UNIQUE INDEX IF NOT EXISTS "IX_student_achievements_StudentID_AchievementID"
     ON "student_achievements" ("StudentID", "AchievementID");
+
+CREATE TABLE IF NOT EXISTS "achievement_award_audit_events" (
+    "Id" uuid PRIMARY KEY,
+    "AwardID" uuid NOT NULL,
+    "EventType" text NOT NULL
+        CHECK ("EventType" IN ('Granted', 'Revoked')),
+    "OccurredAt" timestamptz NOT NULL,
+    "AwardedAt" timestamptz NOT NULL,
+    "StudentID" uuid NOT NULL,
+    "AchievementID" uuid NOT NULL,
+    "AchievementTitle" text NOT NULL,
+    "CourseID" uuid NOT NULL,
+    "Year" integer NOT NULL,
+    "ActorID" uuid NULL,
+    "ActorRole" text NOT NULL
+        CHECK ("ActorRole" IN ('System', 'Teacher', 'Administrator')),
+    "Reason" text NOT NULL
+        CHECK ("Reason" IN ('CriteriaMatched', 'ManualRevocation', 'AchievementDeletion')),
+    "CriterionExpression" text NULL,
+    "CriterionScope" text NULL
+        CHECK ("CriterionScope" IS NULL OR "CriterionScope" IN ('SameMark', 'AcrossCourse', 'AllLabs'))
+);
+
+CREATE INDEX IF NOT EXISTS "IX_achievement_award_audit_events_CourseID_Year_OccurredAt"
+    ON "achievement_award_audit_events" ("CourseID", "Year", "OccurredAt");
+CREATE INDEX IF NOT EXISTS "IX_achievement_award_audit_events_StudentID_OccurredAt"
+    ON "achievement_award_audit_events" ("StudentID", "OccurredAt");
+CREATE INDEX IF NOT EXISTS "IX_achievement_award_audit_events_AchievementID_OccurredAt"
+    ON "achievement_award_audit_events" ("AchievementID", "OccurredAt");

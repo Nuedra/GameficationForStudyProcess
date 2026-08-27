@@ -283,6 +283,17 @@ expect_status 200 \
 expect_node_state "$achievement_three_id" "earned"
 
 expect_status 200 \
+    --cookie "$teacher_cookie" \
+    "$base_url/api/staff/courses/$course_id/2026/achievements/audit?achievementId=$achievement_three_id&studentId=$student_id"
+expect_body_contains '"eventType":"granted"'
+expect_body_contains '"eventType":"revoked"'
+expect_body_contains '"reason":"criteriaMatched"'
+expect_body_contains '"reason":"manualRevocation"'
+expect_body_contains '"actorRole":"system"'
+expect_body_contains '"actorRole":"teacher"'
+expect_body_contains "$teacher_id"
+
+expect_status 200 \
     --cookie "$administrator_cookie" \
     --cookie-jar "$administrator_cookie" \
     --header "Content-Type: application/json" \

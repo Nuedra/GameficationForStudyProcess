@@ -289,6 +289,74 @@ else
             }
         </div>
     </div>
+
+    <div class="card mt-4">
+        <div class="card-body">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <div>
+                    <h2 class="h4 mb-1">Аудит выдач и отзывов</h2>
+                    <p class="text-muted small mb-0">
+                        Последние 100 событий курса. Записи сохраняются после отзыва и удаления достижения.
+                    </p>
+                </div>
+                <button type="button" class="btn btn-outline-secondary btn-sm"
+                        disabled="@_auditLoading" @onclick="() => LoadAuditAsync()">
+                    @(_auditLoading ? "Обновление..." : "Обновить журнал")
+                </button>
+            </div>
+
+            @if (_auditLoading && _auditEvents.Count == 0)
+            {
+                <div class="text-muted">Загрузка журнала...</div>
+            }
+            else if (_auditEvents.Count == 0)
+            {
+                <div class="alert alert-secondary mb-0">Событий выдачи и отзыва пока нет.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th scope="col">Время события</th>
+                                <th scope="col">Событие</th>
+                                <th scope="col">Достижение</th>
+                                <th scope="col">Студент</th>
+                                <th scope="col">Исполнитель и основание</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var auditEvent in _auditEvents)
+                            {
+                                <tr>
+                                    <td class="text-nowrap">@FormatAuditDate(auditEvent.OccurredAt)</td>
+                                    <td>
+                                        <span class="badge @(auditEvent.EventType == AchievementAwardAuditEventType.Granted ? "bg-success" : "bg-danger")">
+                                            @AuditEventLabel(auditEvent.EventType)
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="fw-semibold">@auditEvent.AchievementTitle</div>
+                                        <code class="small">@auditEvent.AchievementId</code>
+                                    </td>
+                                    <td><code class="small">@auditEvent.StudentId</code></td>
+                                    <td>
+                                        <div>@AuditActorLabel(auditEvent)</div>
+                                        <small class="text-muted">@AuditReasonLabel(auditEvent.Reason)</small>
+                                        @if (!string.IsNullOrWhiteSpace(auditEvent.CriterionExpression))
+                                        {
+                                            <div class="small">Критерий: <code>@auditEvent.CriterionExpression</code></div>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
 }
 
 @code {
@@ -320,6 +388,8 @@ else
     private ManagedAchievementDto? _achievementToDelete;
     private ManagedAchievementAwardDto? _awardToRevoke;
     private bool _confirmCriteriaDelete;
+    private bool _auditLoading;
+    private List<AchievementAwardAuditEventDto> _auditEvents = [];
 
     private List<ManagedAchievementDto> FilteredAchievements => _achievements
         .Where(achievement => string.IsNullOrWhiteSpace(_search) ||
@@ -350,7 +420,10 @@ else
                 CourseId,
                 Year);
             if (result.Status == AchievementManagementStatus.Success)
+            {
                 _achievements = result.Achievements?.ToList() ?? [];
+                await LoadAuditAsync(false);
+            }
             else
                 _error = AchievementError(result.Status, "Не удалось загрузить достижения курса.");
         }
@@ -544,6 +617,8 @@ else
                     CloseAwards();
                 if (_selectedAchievementId == achievement.Id)
                     StartCreate();
+                if (achievement.AwardCount > 0)
+                    await LoadAuditAsync(false);
                 _message = achievement.AwardCount > 0
                     ? "Достижение удалено, связанные выдачи отозваны."
                     : "Достижение удалено.";
@@ -637,6 +712,7 @@ else
                 Upsert(result.Achievement);
                 if (_selectedAchievementId == result.Achievement.Id)
                     _selectedAchievement = result.Achievement;
+                await LoadAuditAsync(false);
                 _message = $"Ачивка отозвана у студента {award.StudentId}.";
             }
             else
@@ -721,6 +797,33 @@ else
         _achievements = _achievements.OrderBy(item => item.Title).ToList();
     }
 
+    private async Task LoadAuditAsync(bool surfaceError = true)
+    {
+        _auditLoading = true;
+        try
+        {
+            var result = await AchievementManagementService.GetAwardAuditAsync(
+                _currentUserId,
+                _currentRole,
+                CourseId,
+                Year,
+                limit: 100);
+            if (result.Status == AchievementManagementStatus.Success)
+                _auditEvents = result.AuditEvents?.ToList() ?? [];
+            else if (surfaceError)
+                _error = AchievementError(result.Status, "Не удалось загрузить журнал аудита.");
+        }
+        catch
+        {
+            if (surfaceError)
+                _error = "Не удалось загрузить журнал аудита.";
+        }
+        finally
+        {
+            _auditLoading = false;
+        }
+    }
+
     private void ResetCriteria()
     {
         _criteriaExpression = string.Empty;
@@ -742,6 +845,32 @@ else
         AchievementRarity.Legendary => "Легендарная",
         _ => "Обычная"
     };
+
+    private static string AuditEventLabel(AchievementAwardAuditEventType eventType) =>
+        eventType == AchievementAwardAuditEventType.Granted ? "Выдано" : "Отозвано";
+
+    private static string AuditReasonLabel(AchievementAwardAuditReason reason) => reason switch
+    {
+        AchievementAwardAuditReason.CriteriaMatched => "Критерий выполнен",
+        AchievementAwardAuditReason.AchievementDeletion => "Удаление достижения",
+        _ => "Ручной отзыв"
+    };
+
+    private static string AuditActorLabel(AchievementAwardAuditEventDto auditEvent)
+    {
+        if (auditEvent.ActorRole == AchievementAwardAuditActorRole.System)
+            return "Система";
+
+        var role = auditEvent.ActorRole == AchievementAwardAuditActorRole.Administrator
+            ? "Администратор"
+            : "Преподаватель";
+        return auditEvent.ActorId.HasValue
+            ? $"{role}: {auditEvent.ActorId}"
+            : role;
+    }
+
+    private static string FormatAuditDate(DateTime value) =>
+        value.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss");
 
     private static string AchievementError(
         AchievementManagementStatus status,

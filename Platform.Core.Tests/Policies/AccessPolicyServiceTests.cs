@@ -20,6 +20,7 @@ public sealed class AccessPolicyServiceTests
     {
         Assert.True(_policy.Can(UserRole.Teacher, Permission.ManageCourses));
         Assert.True(_policy.Can(UserRole.Teacher, Permission.EditAchievementCriteria));
+        Assert.True(_policy.Can(UserRole.Teacher, Permission.ViewAchievementAudit));
         Assert.False(_policy.Can(UserRole.Teacher, Permission.ManageUsers));
     }
 

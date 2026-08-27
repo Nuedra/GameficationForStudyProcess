@@ -55,6 +55,16 @@ public interface IAchievementManagementService
         Guid studentId,
         CancellationToken cancellationToken = default);
 
+    Task<AchievementManagementResult> GetAwardAuditAsync(
+        Guid userId,
+        UserRole role,
+        Guid courseId,
+        int year,
+        Guid? achievementId = null,
+        Guid? studentId = null,
+        int limit = 100,
+        CancellationToken cancellationToken = default);
+
     Task<AchievementManagementResult> SaveCriteriaAsync(
         Guid userId,
         UserRole role,
@@ -92,4 +102,5 @@ public sealed record AchievementManagementResult(
     AchievementManagementStatus Status,
     IReadOnlyList<ManagedAchievementDto>? Achievements = null,
     ManagedAchievementDto? Achievement = null,
-    IReadOnlyList<ManagedAchievementAwardDto>? Awards = null);
+    IReadOnlyList<ManagedAchievementAwardDto>? Awards = null,
+    IReadOnlyList<AchievementAwardAuditEventDto>? AuditEvents = null);

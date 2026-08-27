@@ -11,6 +11,7 @@ public sealed class AchievementManagementService(
     AchievementDbContext dbContext,
     IStaffCourseService staffCourseService,
     IAccessPolicyService accessPolicy,
+    TimeProvider timeProvider,
     ILogger<AchievementManagementService> logger) : IAchievementManagementService
 {
     public async Task<AchievementManagementResult> GetAllAsync(
@@ -183,6 +184,15 @@ public sealed class AchievementManagementService(
             var awards = await dbContext.StudentAchievements
                 .Where(item => item.AchievementID == achievementId)
                 .ToListAsync(cancellationToken);
+            var occurredAt = timeProvider.GetUtcNow().UtcDateTime;
+            dbContext.AchievementAwardAuditEvents.AddRange(awards.Select(award =>
+                CreateRevocationAuditEvent(
+                    entity,
+                    award,
+                    userId,
+                    role,
+                    AchievementAwardAuditReason.AchievementDeletion,
+                    occurredAt)));
             dbContext.StudentAchievements.RemoveRange(awards);
         }
 
@@ -267,6 +277,13 @@ public sealed class AchievementManagementService(
         if (award is null)
             return new AchievementManagementResult(AchievementManagementStatus.AwardNotFound);
 
+        dbContext.AchievementAwardAuditEvents.Add(CreateRevocationAuditEvent(
+            achievement,
+            award,
+            userId,
+            role,
+            AchievementAwardAuditReason.ManualRevocation,
+            timeProvider.GetUtcNow().UtcDateTime));
         dbContext.StudentAchievements.Remove(award);
         await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -282,6 +299,67 @@ public sealed class AchievementManagementService(
         return new AchievementManagementResult(
             AchievementManagementStatus.Success,
             Achievement: await BuildDtoAsync(achievement, cancellationToken));
+    }
+
+    public async Task<AchievementManagementResult> GetAwardAuditAsync(
+        Guid userId,
+        UserRole role,
+        Guid courseId,
+        int year,
+        Guid? achievementId = null,
+        Guid? studentId = null,
+        int limit = 100,
+        CancellationToken cancellationToken = default)
+    {
+        if (!accessPolicy.Can(role, Permission.ViewAchievementAudit))
+            return new AchievementManagementResult(AchievementManagementStatus.AccessDenied);
+
+        var accessStatus = await GetAccessStatusAsync(
+            userId,
+            role,
+            courseId,
+            year,
+            cancellationToken);
+        if (accessStatus != AchievementManagementStatus.Success)
+            return new AchievementManagementResult(accessStatus);
+
+        var normalizedLimit = Math.Clamp(limit, 1, 500);
+        var query = dbContext.AchievementAwardAuditEvents
+            .AsNoTracking()
+            .Where(auditEvent =>
+                auditEvent.CourseID == courseId &&
+                auditEvent.Year == year);
+
+        if (achievementId.HasValue)
+            query = query.Where(auditEvent => auditEvent.AchievementID == achievementId.Value);
+        if (studentId.HasValue)
+            query = query.Where(auditEvent => auditEvent.StudentID == studentId.Value);
+
+        var events = await query
+            .OrderByDescending(auditEvent => auditEvent.OccurredAt)
+            .ThenByDescending(auditEvent => auditEvent.Id)
+            .Take(normalizedLimit)
+            .Select(auditEvent => new AchievementAwardAuditEventDto(
+                auditEvent.Id,
+                auditEvent.AwardID,
+                auditEvent.EventType,
+                auditEvent.OccurredAt,
+                auditEvent.AwardedAt,
+                auditEvent.StudentID,
+                auditEvent.AchievementID,
+                auditEvent.AchievementTitle,
+                auditEvent.CourseID,
+                auditEvent.Year,
+                auditEvent.ActorID,
+                auditEvent.ActorRole,
+                auditEvent.Reason,
+                auditEvent.CriterionExpression,
+                auditEvent.CriterionScope))
+            .ToListAsync(cancellationToken);
+
+        return new AchievementManagementResult(
+            AchievementManagementStatus.Success,
+            AuditEvents: events);
     }
 
     public async Task<AchievementManagementResult> SaveCriteriaAsync(
@@ -515,6 +593,39 @@ public sealed class AchievementManagementService(
                     entity.Criteria.Expression,
                     entity.Criteria.Scope,
                     entity.Criteria.IsEnabled));
+    }
+
+    private static AchievementAwardAuditEventEntity CreateRevocationAuditEvent(
+        AchievementEntity achievement,
+        StudentAchievementEntity award,
+        Guid actorId,
+        UserRole actorRole,
+        AchievementAwardAuditReason reason,
+        DateTime occurredAt)
+    {
+        return new AchievementAwardAuditEventEntity
+        {
+            Id = Guid.NewGuid(),
+            AwardID = award.Id,
+            EventType = AchievementAwardAuditEventType.Revoked,
+            OccurredAt = occurredAt,
+            AwardedAt = award.AchievementGotDate,
+            StudentID = award.StudentID,
+            AchievementID = achievement.Id,
+            AchievementTitle = achievement.Title,
+            CourseID = achievement.CourseID,
+            Year = achievement.Year,
+            ActorID = actorId,
+            ActorRole = actorRole switch
+            {
+                UserRole.Teacher => AchievementAwardAuditActorRole.Teacher,
+                UserRole.Administrator => AchievementAwardAuditActorRole.Administrator,
+                _ => throw new InvalidOperationException("Only staff can revoke achievement awards.")
+            },
+            Reason = reason,
+            CriterionExpression = achievement.Criteria?.Expression,
+            CriterionScope = achievement.Criteria?.Scope
+        };
     }
 
     private static SaveAchievementRequest Normalize(SaveAchievementRequest request)

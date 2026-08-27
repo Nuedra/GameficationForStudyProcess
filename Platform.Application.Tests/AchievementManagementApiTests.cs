@@ -131,6 +131,47 @@ public sealed class AchievementManagementApiTests(StudentApiFactory factory)
         var verificationDb = verificationScope.ServiceProvider.GetRequiredService<AchievementDbContext>();
         Assert.False(await verificationDb.StudentAchievements.AnyAsync(
             item => item.AchievementID == achievement.Id));
+        var auditEvent = Assert.Single(await verificationDb.AchievementAwardAuditEvents
+            .Where(item => item.AchievementID == achievement.Id)
+            .ToListAsync());
+        Assert.Equal(AchievementAwardAuditEventType.Revoked, auditEvent.EventType);
+        Assert.Equal(AchievementAwardAuditReason.AchievementDeletion, auditEvent.Reason);
+        Assert.Equal(AchievementAwardAuditActorRole.Administrator, auditEvent.ActorRole);
+        Assert.Equal(StudentApiFactory.AdministratorId, auditEvent.ActorID);
+    }
+
+    [Fact]
+    public async Task Teacher_CanRevokeAwardAndReadPersistentAuditEvent()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.TeacherId);
+
+        var revoke = await client.DeleteAsync(
+            $"{AchievementsUrl(StudentApiFactory.CourseId)}/{StudentApiFactory.EarnedAchievementId}/awards/{StudentApiFactory.StudentId}");
+        var audit = await client.GetAsync(
+            $"{AchievementsUrl(StudentApiFactory.CourseId)}/audit?studentId={StudentApiFactory.StudentId}");
+
+        Assert.Equal(HttpStatusCode.OK, revoke.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, audit.StatusCode);
+        var events = await audit.Content.ReadFromJsonAsync<List<AchievementAwardAuditEventDto>>(
+            JsonOptions);
+        var auditEvent = Assert.Single(events!);
+        Assert.Equal(AchievementAwardAuditEventType.Revoked, auditEvent.EventType);
+        Assert.Equal(AchievementAwardAuditReason.ManualRevocation, auditEvent.Reason);
+        Assert.Equal(AchievementAwardAuditActorRole.Teacher, auditEvent.ActorRole);
+        Assert.Equal(StudentApiFactory.TeacherId, auditEvent.ActorId);
+        Assert.Equal(StudentApiFactory.StudentId, auditEvent.StudentId);
+        Assert.Equal(StudentApiFactory.EarnedAchievementId, auditEvent.AchievementId);
+
+        using var verificationScope = factory.Services.CreateScope();
+        var verificationDb = verificationScope.ServiceProvider
+            .GetRequiredService<AchievementDbContext>();
+        Assert.False(await verificationDb.StudentAchievements.AnyAsync(item =>
+            item.StudentID == StudentApiFactory.StudentId &&
+            item.AchievementID == StudentApiFactory.EarnedAchievementId));
+        Assert.True(await verificationDb.AchievementAwardAuditEvents.AnyAsync(item =>
+            item.StudentID == StudentApiFactory.StudentId &&
+            item.AchievementID == StudentApiFactory.EarnedAchievementId));
     }
 
     [Fact]
