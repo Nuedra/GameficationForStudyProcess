@@ -16,8 +16,7 @@ namespace Platform.Application.Controllers;
 [Route("api/auth")]
 [Produces("application/json")]
 public sealed class AuthController(
-    IUserIdentityService userIdentityService,
-    TimeProvider timeProvider,
+    IUserSessionService userSessionService,
     ILogger<AuthController> logger) : ControllerBase
 {
     [HttpGet("csrf")]
@@ -57,7 +56,10 @@ public sealed class AuthController(
             return BadRequest(ApiErrors.InvalidUserId);
         }
 
-        var user = await userIdentityService.ResolveByIdAsync(request.Id, cancellationToken);
+        var user = await userSessionService.SignInAsync(
+            HttpContext,
+            request.Id,
+            cancellationToken);
         if (user is null)
         {
             logger.LogWarning(
@@ -67,42 +69,7 @@ public sealed class AuthController(
             return Unauthorized(ApiErrors.InvalidCredentials);
         }
 
-        var sessionId = Guid.NewGuid();
-        var issuedUtc = timeProvider.GetUtcNow();
-        var expiresUtc = issuedUtc.AddHours(8);
-
-        var claims = new[]
-        {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Name, user.DisplayName),
-            new Claim(ClaimTypes.Role, UserRoleDictionary.Values[user.Role]),
-            new Claim(PlatformClaimTypes.SessionId, sessionId.ToString())
-        }.ToList();
-        if (!string.IsNullOrWhiteSpace(user.Group))
-            claims.Add(new Claim(PlatformClaimTypes.Group, user.Group));
-        var identity = new ClaimsIdentity(
-            claims,
-            CookieAuthenticationDefaults.AuthenticationScheme);
-        var principal = new ClaimsPrincipal(identity);
-
-        await HttpContext.SignInAsync(
-            CookieAuthenticationDefaults.AuthenticationScheme,
-            principal,
-            new AuthenticationProperties
-            {
-                IsPersistent = false,
-                IssuedUtc = issuedUtc,
-                ExpiresUtc = expiresUtc
-            });
-
-        logger.LogInformation(
-            "GUID login succeeded. UserId={UserId}, Role={Role}, SessionId={SessionId}, RemoteIp={RemoteIp}",
-            user.Id,
-            UserRoleDictionary.Values[user.Role],
-            sessionId,
-            HttpContext.Connection.RemoteIpAddress);
-
-        return Ok(ToDto(user));
+        return Ok(user);
     }
 
     /// <summary>
@@ -159,16 +126,7 @@ public sealed class AuthController(
     [ProducesResponseType(typeof(ApiErrorDto), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Logout()
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var role = User.FindFirstValue(ClaimTypes.Role);
-        var sessionId = User.FindFirstValue(PlatformClaimTypes.SessionId);
-        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-        logger.LogInformation(
-            "Authentication session ended. UserId={UserId}, Role={Role}, SessionId={SessionId}, RemoteIp={RemoteIp}",
-            userId,
-            role,
-            sessionId,
-            HttpContext.Connection.RemoteIpAddress);
+        await userSessionService.SignOutAsync(HttpContext);
         return NoContent();
     }
 
@@ -189,12 +147,4 @@ public sealed class AuthController(
         return true;
     }
 
-    private static AuthenticatedUserDto ToDto(ResolvedUserIdentity user)
-    {
-        return new AuthenticatedUserDto(
-            user.Id,
-            user.DisplayName,
-            user.Role,
-            user.Group);
-    }
 }

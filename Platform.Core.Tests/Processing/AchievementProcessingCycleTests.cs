@@ -39,6 +39,16 @@ public sealed class AchievementProcessingCycleTests
         Assert.Equal(foundAt.UtcDateTime, assigned.AchievementFoundDate);
         Assert.False(assigned.IsNotificationSeen);
         Assert.False(assigned.IsFirstAnimationShown);
+        var auditEvent = Assert.Single(await db.AchievementAwardAuditEvents.ToListAsync());
+        Assert.Equal(assigned.Id, auditEvent.AwardID);
+        Assert.Equal(AchievementAwardAuditEventType.Granted, auditEvent.EventType);
+        Assert.Equal(AchievementAwardAuditActorRole.System, auditEvent.ActorRole);
+        Assert.Equal(AchievementAwardAuditReason.CriteriaMatched, auditEvent.Reason);
+        Assert.Equal(StudentId, auditEvent.StudentID);
+        Assert.Equal(achievement.Id, auditEvent.AchievementID);
+        Assert.Equal("tag1, tag2", auditEvent.CriterionExpression);
+        Assert.Equal(foundAt.UtcDateTime, auditEvent.OccurredAt);
+        Assert.Equal(uploadedAt.UtcDateTime, auditEvent.AwardedAt);
     }
 
     [Fact]
@@ -60,6 +70,7 @@ public sealed class AchievementProcessingCycleTests
         Assert.Single(secondResult.MatchedAchievements);
         await using var db = CreateDbContext(databaseName);
         Assert.Single(await db.StudentAchievements.ToListAsync());
+        Assert.Single(await db.AchievementAwardAuditEvents.ToListAsync());
     }
 
     [Fact]

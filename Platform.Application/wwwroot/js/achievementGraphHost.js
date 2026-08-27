@@ -1,5 +1,24 @@
 (function () {
     const mountedApps = new Map();
+    let csrfToken = null;
+
+    async function protectedGraphFetch(url, options) {
+        if (!csrfToken) {
+            const tokenResponse = await fetch('/api/auth/csrf', { credentials: 'include' });
+            if (!tokenResponse.ok)
+                throw new Error('Не удалось получить CSRF-токен графа.');
+            csrfToken = (await tokenResponse.json()).token;
+        }
+
+        return await fetch(url, {
+            ...options,
+            credentials: 'include',
+            headers: {
+                ...(options?.headers || {}),
+                'X-CSRF-TOKEN': csrfToken
+            }
+        });
+    }
 
     async function render(elementId, courseId, year, width, height) {
         return await loadGraph(elementId, courseId, year, width, height, false);
@@ -38,7 +57,7 @@
                 headers: { Accept: "application/xml" }
             };
             const response = useRefresh
-                ? await window.platformApi.protectedFetch(url, requestOptions)
+                ? await protectedGraphFetch(url, requestOptions)
                 : await fetch(url, requestOptions);
 
             if (!response.ok) {
@@ -62,14 +81,6 @@
             app.mount(container);
             mountedApps.set(elementId, app);
 
-            // loadGraphFromXml is async and internally does `await initializeGraphFromXml()`.
-            // That `await` introduces one extra microtask boundary even though
-            // initializeGraphFromXml has no real async work.
-            //
-            // Microtask order after app.mount():
-            //   1st nextTick → loadGraphFromXml starts, suspends at `await init…`
-            //   2nd nextTick → init… continuation runs (graph + nodes created, RAF scheduled)
-            //   fitGraphViewport runs → sets viewport on the SAME pending RAF → no flash
             await window.Vue.nextTick();
             await window.Vue.nextTick();
             fitGraphViewport(container, effectiveWidth, effectiveHeight);
@@ -81,11 +92,8 @@
         }
     }
 
-    // Compute bounding box of all nodes and set scale + offset so the full graph
-    // fits in the canvas, centered.  Runs before the first RAF draw → no flash.
     function fitGraphViewport(container, canvasW, canvasH) {
         try {
-            // Vue 3 internal path: app._instance.subTree.component.data.graph
             const graph =
                 container.__vue_app__
                           ?._instance
@@ -104,8 +112,6 @@
                 const x = node._x ?? 0;
                 const y = node._y ?? 0;
 
-                // Circle: center (x,y), radius
-                // Rectangle / other: top-left (x,y), width/height
                 if (node._radius !== undefined) {
                     minX = Math.min(minX, x - node._radius);
                     maxX = Math.max(maxX, x + node._radius);
@@ -137,10 +143,6 @@
             graph._scale   = fitScale;
             graph._offsetX = canvasW / 2 - centerX * fitScale;
             graph._offsetY = canvasH / 2 - centerY * fitScale;
-
-            // requestRedraw is NOT called here:
-            // loadGraphFromXml already scheduled an RAF; that RAF will use
-            // the viewport values we just set above.
 
         } catch (_) {
             // Viewport fitting failed — the graph will open with default viewport

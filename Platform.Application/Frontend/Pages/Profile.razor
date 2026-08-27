@@ -1,6 +1,6 @@
 @page "/profile"
 @attribute [Authorize(Roles = "student")]
-@inject IJSRuntime JsRuntime
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Профиль студента — Платформа достижений</PageTitle>
 
@@ -56,10 +56,8 @@ else
     private StudentInfo? _student;
     private string? _error;
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override async Task OnInitializedAsync()
     {
-        if (!firstRender) return;
-
         await LoadProfileAsync();
     }
 
@@ -71,20 +69,28 @@ else
 
         try
         {
-            var result = await JsRuntime.InvokeAsync<SessionResult>("platformApi.getCurrentUser");
-            _student = result.Success ? result.User : null;
-            _error = result.Success || result.Status == 401
-                ? null
-                : result.Message ?? "Не удалось загрузить профиль.";
+            var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authenticationState.User;
+            if (!user.TryGetUserId(out var userId))
+            {
+                _student = null;
+                return;
+            }
+
+            _student = new StudentInfo
+            {
+                Id = userId,
+                DisplayName = user.Identity?.Name ?? string.Empty,
+                Group = user.FindFirst(PlatformClaimTypes.Group)?.Value ?? string.Empty
+            };
         }
         catch
         {
-            _error = "Не удалось связаться с сервером. Проверьте подключение и повторите запрос.";
+            _error = "Не удалось получить данные текущего пользователя.";
         }
         finally
         {
             _isLoading = false;
-            StateHasChanged();
         }
     }
 
@@ -93,13 +99,5 @@ else
         public Guid Id { get; set; }
         public string DisplayName { get; set; } = "";
         public string Group { get; set; } = "";
-    }
-
-    private sealed class SessionResult
-    {
-        public bool Success { get; set; }
-        public int Status { get; set; }
-        public string? Message { get; set; }
-        public StudentInfo? User { get; set; }
     }
 }

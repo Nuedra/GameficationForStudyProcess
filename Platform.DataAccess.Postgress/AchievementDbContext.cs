@@ -13,6 +13,8 @@ public sealed class AchievementDbContext(DbContextOptions<AchievementDbContext> 
     public DbSet<StudentAchievementEntity> StudentAchievements => Set<StudentAchievementEntity>();
     public DbSet<AchievementCriteriaEntity> AchievementCriterias => Set<AchievementCriteriaEntity>();
     public DbSet<AchievementConnectionEntity> AchievementConnections => Set<AchievementConnectionEntity>();
+    public DbSet<AchievementAwardAuditEventEntity> AchievementAwardAuditEvents =>
+        Set<AchievementAwardAuditEventEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -22,6 +24,7 @@ public sealed class AchievementDbContext(DbContextOptions<AchievementDbContext> 
         ConfigureStudentAchievements(modelBuilder);
         ConfigureAchievementCriteria(modelBuilder);
         ConfigureAchievementConnections(modelBuilder);
+        ConfigureAchievementAwardAuditEvents(modelBuilder);
     }
 
     private static void ConfigureAchievements(ModelBuilder modelBuilder)
@@ -123,6 +126,71 @@ public sealed class AchievementDbContext(DbContextOptions<AchievementDbContext> 
 
             entity.HasIndex(connection => new { connection.SourceId, connection.TargetId })
                 .IsUnique();
+        });
+    }
+
+    private static void ConfigureAchievementAwardAuditEvents(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AchievementAwardAuditEventEntity>(entity =>
+        {
+            entity.ToTable("achievement_award_audit_events");
+            entity.HasKey(auditEvent => auditEvent.Id);
+
+            entity.Property(auditEvent => auditEvent.AwardID).IsRequired();
+            entity.Property(auditEvent => auditEvent.EventType)
+                .HasConversion<string>()
+                .IsRequired();
+            entity.Property(auditEvent => auditEvent.OccurredAt).IsRequired();
+            entity.Property(auditEvent => auditEvent.AwardedAt).IsRequired();
+            entity.Property(auditEvent => auditEvent.StudentID).IsRequired();
+            entity.Property(auditEvent => auditEvent.AchievementID).IsRequired();
+            entity.Property(auditEvent => auditEvent.AchievementTitle).IsRequired();
+            entity.Property(auditEvent => auditEvent.CourseID).IsRequired();
+            entity.Property(auditEvent => auditEvent.Year).IsRequired();
+            entity.Property(auditEvent => auditEvent.ActorID).IsRequired(false);
+            entity.Property(auditEvent => auditEvent.ActorRole)
+                .HasConversion<string>()
+                .IsRequired();
+            entity.Property(auditEvent => auditEvent.Reason)
+                .HasConversion<string>()
+                .IsRequired();
+            entity.Property(auditEvent => auditEvent.CriterionExpression).IsRequired(false);
+            entity.Property(auditEvent => auditEvent.CriterionScope)
+                .HasConversion<string>()
+                .IsRequired(false);
+
+            entity.HasIndex(auditEvent => new
+            {
+                auditEvent.CourseID,
+                auditEvent.Year,
+                auditEvent.OccurredAt
+            });
+            entity.HasIndex(auditEvent => new
+            {
+                auditEvent.StudentID,
+                auditEvent.OccurredAt
+            });
+            entity.HasIndex(auditEvent => new
+            {
+                auditEvent.AchievementID,
+                auditEvent.OccurredAt
+            });
+
+            entity.ToTable(table =>
+            {
+                table.HasCheckConstraint(
+                    "CK_achievement_award_audit_events_EventType",
+                    "\"EventType\" IN ('Granted', 'Revoked')");
+                table.HasCheckConstraint(
+                    "CK_achievement_award_audit_events_ActorRole",
+                    "\"ActorRole\" IN ('System', 'Teacher', 'Administrator')");
+                table.HasCheckConstraint(
+                    "CK_achievement_award_audit_events_Reason",
+                    "\"Reason\" IN ('CriteriaMatched', 'ManualRevocation', 'AchievementDeletion')");
+                table.HasCheckConstraint(
+                    "CK_achievement_award_audit_events_CriterionScope",
+                    "\"CriterionScope\" IS NULL OR \"CriterionScope\" IN ('SameMark', 'AcrossCourse', 'AllLabs')");
+            });
         });
     }
 }

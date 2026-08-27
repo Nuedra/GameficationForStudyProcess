@@ -34,6 +34,12 @@ CREATE TABLE IF NOT EXISTS "achievements" (
     "CourseID" uuid NOT NULL
 );
 
+-- Older EXT-03.2 revisions created this index before legacy demo data was
+-- aligned. Drop it during bootstrap so existing local databases can be
+-- recreated idempotently; title uniqueness is enforced by the application
+-- service for new and edited achievements.
+DROP INDEX IF EXISTS "IX_achievements_CourseID_Year_Title";
+
 CREATE INDEX IF NOT EXISTS "IX_achievements_CourseID"
     ON "achievements" ("CourseID");
 CREATE INDEX IF NOT EXISTS "IX_achievements_LabID"
@@ -50,6 +56,25 @@ CREATE TABLE IF NOT EXISTS "course_instances" (
 
 CREATE UNIQUE INDEX IF NOT EXISTS "IX_course_instances_ContentScopeID"
     ON "course_instances" ("ContentScopeID");
+
+-- Временная локальная проекция Course.CourseInstanceTeachers из концептуальной
+-- LMS-схемы. PersonID намеренно не ссылается на students: преподаватели в
+-- текущем demo-режиме разрешаются из конфигурации, а не из таблицы людей.
+CREATE TABLE IF NOT EXISTS "course_instance_teachers" (
+    "CourseID" uuid NOT NULL,
+    "Year" integer NOT NULL,
+    "PersonID" uuid NOT NULL,
+    "StartDate" timestamptz NOT NULL,
+    "EndDate" timestamptz NULL,
+    "IsLead" boolean NOT NULL DEFAULT FALSE,
+    PRIMARY KEY ("CourseID", "Year", "PersonID"),
+    FOREIGN KEY ("CourseID", "Year")
+        REFERENCES "course_instances" ("CourseID", "Year") ON DELETE CASCADE,
+    CHECK ("EndDate" IS NULL OR "StartDate" < "EndDate")
+);
+
+CREATE INDEX IF NOT EXISTS "IX_course_instance_teachers_PersonID"
+    ON "course_instance_teachers" ("PersonID");
 
 CREATE TABLE IF NOT EXISTS "educational_groups" (
     "GroupName" text PRIMARY KEY,
@@ -126,3 +151,32 @@ CREATE INDEX IF NOT EXISTS "IX_student_achievements_LabID"
     ON "student_achievements" ("LabID");
 CREATE UNIQUE INDEX IF NOT EXISTS "IX_student_achievements_StudentID_AchievementID"
     ON "student_achievements" ("StudentID", "AchievementID");
+
+CREATE TABLE IF NOT EXISTS "achievement_award_audit_events" (
+    "Id" uuid PRIMARY KEY,
+    "AwardID" uuid NOT NULL,
+    "EventType" text NOT NULL
+        CHECK ("EventType" IN ('Granted', 'Revoked')),
+    "OccurredAt" timestamptz NOT NULL,
+    "AwardedAt" timestamptz NOT NULL,
+    "StudentID" uuid NOT NULL,
+    "AchievementID" uuid NOT NULL,
+    "AchievementTitle" text NOT NULL,
+    "CourseID" uuid NOT NULL,
+    "Year" integer NOT NULL,
+    "ActorID" uuid NULL,
+    "ActorRole" text NOT NULL
+        CHECK ("ActorRole" IN ('System', 'Teacher', 'Administrator')),
+    "Reason" text NOT NULL
+        CHECK ("Reason" IN ('CriteriaMatched', 'ManualRevocation', 'AchievementDeletion')),
+    "CriterionExpression" text NULL,
+    "CriterionScope" text NULL
+        CHECK ("CriterionScope" IS NULL OR "CriterionScope" IN ('SameMark', 'AcrossCourse', 'AllLabs'))
+);
+
+CREATE INDEX IF NOT EXISTS "IX_achievement_award_audit_events_CourseID_Year_OccurredAt"
+    ON "achievement_award_audit_events" ("CourseID", "Year", "OccurredAt");
+CREATE INDEX IF NOT EXISTS "IX_achievement_award_audit_events_StudentID_OccurredAt"
+    ON "achievement_award_audit_events" ("StudentID", "OccurredAt");
+CREATE INDEX IF NOT EXISTS "IX_achievement_award_audit_events_AchievementID_OccurredAt"
+    ON "achievement_award_audit_events" ("AchievementID", "OccurredAt");

@@ -117,6 +117,103 @@ public sealed class StudentApiTests(StudentApiFactory factory)
     }
 
     [Fact]
+    public async Task StaffCourses_WithoutAuthentication_ReturnsUnauthorized()
+    {
+        using var client = CreateClient();
+
+        var response = await client.GetAsync("/api/staff/courses");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ApiErrorDto>(JsonOptions);
+        Assert.Equal("authentication_required", error!.Code);
+    }
+
+    [Fact]
+    public async Task StaffCourses_StudentRole_ReturnsForbidden()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.StudentId);
+
+        var response = await client.GetAsync("/api/staff/courses");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ApiErrorDto>(JsonOptions);
+        Assert.Equal("access_denied", error!.Code);
+    }
+
+    [Fact]
+    public async Task StaffCourses_Teacher_ReturnsOnlyActivelyAssignedCourse()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.TeacherId);
+
+        var courses = await client.GetFromJsonAsync<List<CourseDto>>(
+            "/api/staff/courses",
+            JsonOptions);
+
+        var course = Assert.Single(courses!);
+        Assert.Equal(StudentApiFactory.CourseId, course.Id);
+        Assert.Equal(2026, course.Year);
+    }
+
+    [Fact]
+    public async Task StaffCourse_TeacherAssignedCourse_ReturnsCourse()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.TeacherId);
+
+        var response = await client.GetAsync(
+            $"/api/staff/courses/{StudentApiFactory.CourseId}/2026");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var course = await response.Content.ReadFromJsonAsync<CourseDto>(JsonOptions);
+        Assert.Equal(StudentApiFactory.CourseId, course!.Id);
+    }
+
+    [Fact]
+    public async Task StaffCourse_TeacherForeignCourse_ReturnsForbidden()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.TeacherId);
+
+        var response = await client.GetAsync(
+            $"/api/staff/courses/{StudentApiFactory.OtherCourseId}/2026");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ApiErrorDto>(JsonOptions);
+        Assert.Equal("course_access_denied", error!.Code);
+    }
+
+    [Fact]
+    public async Task StaffCourses_Administrator_ReturnsEveryCourse()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.AdministratorId);
+
+        var courses = await client.GetFromJsonAsync<List<CourseDto>>(
+            "/api/staff/courses",
+            JsonOptions);
+
+        Assert.Equal(2, courses!.Count);
+        Assert.Contains(courses, course => course.Id == StudentApiFactory.CourseId);
+        Assert.Contains(courses, course => course.Id == StudentApiFactory.OtherCourseId);
+    }
+
+    [Fact]
+    public async Task StaffCourse_AdministratorCanOpenUnassignedCourse()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.AdministratorId);
+
+        var response = await client.GetAsync(
+            $"/api/staff/courses/{StudentApiFactory.OtherCourseId}/2026");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var course = await response.Content.ReadFromJsonAsync<CourseDto>(JsonOptions);
+        Assert.Equal(StudentApiFactory.OtherCourseId, course!.Id);
+    }
+
+    [Fact]
     public async Task Session_AuthenticatedUser_ReturnsLifecycleMetadata()
     {
         using var client = CreateClient();

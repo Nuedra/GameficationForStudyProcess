@@ -1,11 +1,14 @@
-@page "/courses"
-@attribute [Authorize(Roles = "student")]
+@page "/staff/courses"
+@attribute [Authorize(Roles = "teacher,administrator")]
 @inject AuthenticationStateProvider AuthenticationStateProvider
-@inject IStudentCourseService StudentCourseService
+@inject IStaffCourseService StaffCourseService
 
-<PageTitle>Курсы — Платформа достижений</PageTitle>
+<PageTitle>Курсы кабинета — Платформа достижений</PageTitle>
 
-<h1>Мои курсы</h1>
+<h1>Экземпляры курсов</h1>
+<p class="text-muted">
+    Список загружается через read-only контракт LMS с учётом вашей роли и активных назначений.
+</p>
 
 @if (_isLoading)
 {
@@ -14,24 +17,17 @@
         <span class="text-muted">Загрузка...</span>
     </div>
 }
-else if (_error != null)
+else if (_error is not null)
 {
     <div class="alert alert-danger mt-3">
         @_error
         <button class="btn btn-outline-danger btn-sm ms-2" @onclick="LoadCoursesAsync">Повторить</button>
     </div>
 }
-else if (!_isAuthenticated)
-{
-    <div class="alert alert-warning mt-3">
-        <span class="oi oi-warning me-2" aria-hidden="true"></span>
-        Необходимо <a href="login">войти в систему</a>, чтобы просматривать курсы.
-    </div>
-}
-else if (_courses == null || _courses.Count == 0)
+else if (_courses is null || _courses.Count == 0)
 {
     <div class="alert alert-info mt-3">
-        Курсы не найдены. Обратитесь к администратору.
+        Доступные экземпляры курсов не найдены.
     </div>
 }
 else
@@ -40,7 +36,7 @@ else
         @foreach (var course in _courses)
         {
             <div class="col-md-6 col-lg-4">
-                <div class="card h-100 course-card">
+                <div class="card h-100">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start mb-2">
                             <h5 class="card-title mb-0">@course.Title</h5>
@@ -52,9 +48,9 @@ else
                         }
                     </div>
                     <div class="card-footer bg-transparent border-top-0 pt-0">
-                        <a href="student/courses/@course.Id/@course.Year/achievement-graph"
-                           class="btn btn-outline-primary btn-sm">
-                            <span class="oi oi-graph me-1" aria-hidden="true"></span>Граф достижений
+                        <a class="btn btn-outline-primary btn-sm"
+                           href="staff/courses/@course.Id/@course.Year">
+                            Открыть кабинет курса
                         </a>
                     </div>
                 </div>
@@ -65,7 +61,6 @@ else
 
 @code {
     private bool _isLoading = true;
-    private bool _isAuthenticated;
     private IReadOnlyList<CourseDto>? _courses;
     private string? _error;
 
@@ -83,18 +78,22 @@ else
         try
         {
             var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-            if (!authenticationState.User.TryGetUserId(out var studentId))
+            var user = authenticationState.User;
+            if (!user.TryGetUserId(out var userId) || !user.TryGetUserRole(out var role))
             {
-                _isAuthenticated = false;
+                _error = "Не удалось определить текущего пользователя.";
                 return;
             }
 
-            _isAuthenticated = true;
-            _courses = await StudentCourseService.GetCoursesAsync(studentId);
+            var result = await StaffCourseService.GetCoursesAsync(userId, role);
+            if (result.Status == StaffCourseQueryStatus.Success)
+                _courses = result.Courses;
+            else
+                _error = "У вас нет доступа к списку курсов.";
         }
         catch
         {
-            _error = "Не удалось загрузить список курсов.";
+            _error = "Не удалось загрузить курсы кабинета.";
         }
         finally
         {

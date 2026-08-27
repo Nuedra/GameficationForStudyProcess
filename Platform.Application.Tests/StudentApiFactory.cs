@@ -209,6 +209,15 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
                 Student = otherStudent,
                 CourseInstance = otherCourseInstance,
                 StartDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+            },
+            new CourseInstanceTeacherEntity
+            {
+                CourseID = CourseId,
+                Year = 2026,
+                PersonID = TeacherId,
+                CourseInstance = courseInstance,
+                StartDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                IsLead = true
             });
 
         lmsDbContext.SaveChanges();

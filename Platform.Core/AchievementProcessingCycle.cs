@@ -137,7 +137,35 @@ public sealed class AchievementProcessingCycle
 
         if (assignedEntities.Count > 0)
         {
+            var assignedByAchievementId = assignedEntities
+                .ToDictionary(assigned => assigned.AchievementID);
+            var auditEvents = assignableEntities
+                .Select(achievement =>
+                {
+                    var assigned = assignedByAchievementId[achievement.Id];
+                    return new AchievementAwardAuditEventEntity
+                    {
+                        Id = Guid.NewGuid(),
+                        AwardID = assigned.Id,
+                        EventType = AchievementAwardAuditEventType.Granted,
+                        OccurredAt = now,
+                        AwardedAt = assigned.AchievementGotDate,
+                        StudentID = studentId,
+                        AchievementID = achievement.Id,
+                        AchievementTitle = achievement.Title,
+                        CourseID = achievement.CourseID,
+                        Year = achievement.Year,
+                        ActorID = null,
+                        ActorRole = AchievementAwardAuditActorRole.System,
+                        Reason = AchievementAwardAuditReason.CriteriaMatched,
+                        CriterionExpression = achievement.Criteria.Expression,
+                        CriterionScope = achievement.Criteria.Scope
+                    };
+                })
+                .ToList();
+
             db.StudentAchievements.AddRange(assignedEntities);
+            db.AchievementAwardAuditEvents.AddRange(auditEvents);
             await db.SaveChangesAsync(cancellationToken);
         }
 

@@ -14,6 +14,7 @@ public sealed class PlatformDbContextModelTests
         Assert.NotNull(dbContext.Model.FindEntityType(typeof(AchievementEntity)));
         Assert.Null(dbContext.Model.FindEntityType(typeof(StudentEntity)));
         Assert.Null(dbContext.Model.FindEntityType(typeof(CourseEntity)));
+        Assert.Null(dbContext.Model.FindEntityType(typeof(CourseInstanceTeacherEntity)));
     }
 
     [Fact]
@@ -23,6 +24,7 @@ public sealed class PlatformDbContextModelTests
 
         Assert.NotNull(dbContext.Model.FindEntityType(typeof(StudentEntity)));
         Assert.NotNull(dbContext.Model.FindEntityType(typeof(CourseEntity)));
+        Assert.NotNull(dbContext.Model.FindEntityType(typeof(CourseInstanceTeacherEntity)));
         Assert.Null(dbContext.Model.FindEntityType(typeof(AchievementEntity)));
     }
 
@@ -98,6 +100,31 @@ public sealed class PlatformDbContextModelTests
                 nameof(GroupStudentEntity.StartDate)
             ],
             keyProperties);
+    }
+
+    [Fact]
+    public void CourseInstanceTeacher_UsesCourseYearAndPersonAsCompositeKey()
+    {
+        using var dbContext = CreateLocalLmsDbContext();
+        var entity = dbContext.Model.FindEntityType(typeof(CourseInstanceTeacherEntity));
+
+        var keyProperties = entity!.FindPrimaryKey()!
+            .Properties
+            .Select(property => property.Name);
+
+        Assert.Equal(
+            [
+                nameof(CourseInstanceTeacherEntity.CourseID),
+                nameof(CourseInstanceTeacherEntity.Year),
+                nameof(CourseInstanceTeacherEntity.PersonID)
+            ],
+            keyProperties);
+        Assert.Contains(
+            entity.GetForeignKeys(),
+            key => key.PrincipalEntityType.ClrType == typeof(CourseInstanceEntity));
+        Assert.DoesNotContain(
+            entity.GetForeignKeys(),
+            key => key.PrincipalEntityType.ClrType == typeof(StudentEntity));
     }
 
     [Fact]
