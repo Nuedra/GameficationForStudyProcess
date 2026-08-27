@@ -255,6 +255,42 @@
         }
     }
 
+    async function getManagedAchievementAwards(courseId, year, achievementId) {
+        try {
+            const response = await fetch(
+                `/api/staff/courses/${encodeURIComponent(courseId)}/${encodeURIComponent(year)}/achievements/${encodeURIComponent(achievementId)}/awards`,
+                { credentials: 'include' });
+            if (response.ok)
+                return { success: true, awards: await response.json() };
+
+            return {
+                success: false,
+                status: response.status,
+                message: await readApiError(response, 'Не удалось загрузить список студентов.')
+            };
+        } catch {
+            return { success: false, status: 0, message: networkError() };
+        }
+    }
+
+    async function revokeManagedAchievementAward(courseId, year, achievementId, studentId) {
+        try {
+            const response = await protectedFetch(
+                `/api/staff/courses/${encodeURIComponent(courseId)}/${encodeURIComponent(year)}/achievements/${encodeURIComponent(achievementId)}/awards/${encodeURIComponent(studentId)}`,
+                { method: 'DELETE' });
+            if (response.ok)
+                return { success: true, achievement: await response.json() };
+
+            return {
+                success: false,
+                status: response.status,
+                message: await readApiError(response, 'Не удалось отозвать ачивку у студента.')
+            };
+        } catch {
+            return { success: false, status: 0, message: networkError() };
+        }
+    }
+
     async function saveManagedAchievementCriteria(courseId, year, achievementId, criteria) {
         try {
             const response = await protectedFetch(
@@ -310,6 +346,8 @@
         getManagedAchievements,
         saveManagedAchievement,
         deleteManagedAchievement,
+        getManagedAchievementAwards,
+        revokeManagedAchievementAward,
         saveManagedAchievementCriteria,
         deleteManagedAchievementCriteria
     };

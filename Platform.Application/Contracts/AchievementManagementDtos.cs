@@ -22,6 +22,9 @@ public sealed record ManagedAchievementCriteriaDto(
     AchievementCriteriaScope Scope,
     bool IsEnabled);
 
+public sealed record ManagedAchievementAwardDto(
+    Guid StudentId);
+
 public sealed record SaveAchievementRequest(
     string Title,
     string? Description,

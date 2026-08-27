@@ -67,7 +67,13 @@ else
                                                 <small class="text-muted">@achievement.Track</small>
                                                 @if (achievement.AwardCount > 0)
                                                 {
-                                                    <span class="badge bg-info text-dark ms-1">выдано: @achievement.AwardCount</span>
+                                                    <button type="button"
+                                                            class="badge bg-info text-dark border-0 ms-1"
+                                                            title="Показать студентов"
+                                                            disabled="@_isSaving"
+                                                            @onclick="() => ToggleAwardsAsync(achievement)">
+                                                        выдано: @achievement.AwardCount
+                                                    </button>
                                                 }
                                                 @if (achievement.HasDependencies)
                                                 {
@@ -103,6 +109,49 @@ else
                                     }
                                 </tbody>
                             </table>
+                        </div>
+                    }
+
+                    @if (_awardAchievementId.HasValue)
+                    {
+                        <div class="border rounded p-3 mt-3">
+                            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                                <div>
+                                    <h3 class="h6 mb-1">Студенты, получившие ачивку</h3>
+                                    <div class="text-muted small">@_awardAchievementTitle</div>
+                                </div>
+                                <button type="button" class="btn-close" aria-label="Закрыть"
+                                        @onclick="CloseAwards"></button>
+                            </div>
+
+                            @if (_awardsLoading)
+                            {
+                                <div class="text-muted small">Загрузка...</div>
+                            }
+                            else if (_awards.Count == 0)
+                            {
+                                <div class="text-muted small">Активных выдач нет.</div>
+                            }
+                            else
+                            {
+                                <div class="list-group">
+                                    @foreach (var award in _awards)
+                                    {
+                                        <div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                            <code>@award.StudentId</code>
+                                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                                    disabled="@_isSaving"
+                                                    @onclick="() => RevokeAwardAsync(award)">
+                                                Отозвать
+                                            </button>
+                                        </div>
+                                    }
+                                </div>
+                            }
+
+                            <p class="text-muted small mb-0 mt-2">
+                                После отзыва студент сможет получить ачивку снова, если критерий будет выполнен при следующей обработке.
+                            </p>
                         </div>
                     }
                 </div>
@@ -216,6 +265,10 @@ else
     private string _criteriaExpression = string.Empty;
     private string _criteriaScope = "sameMark";
     private bool _criteriaEnabled = true;
+    private Guid? _awardAchievementId;
+    private string _awardAchievementTitle = string.Empty;
+    private bool _awardsLoading;
+    private List<ManagedAward> _awards = [];
 
     private List<ManagedAchievement> FilteredAchievements => _achievements
         .Where(achievement => string.IsNullOrWhiteSpace(_search) ||
@@ -400,6 +453,8 @@ else
             if (result.Success)
             {
                 _achievements.RemoveAll(item => item.Id == achievement.Id);
+                if (_awardAchievementId == achievement.Id)
+                    CloseAwards();
                 if (_selectedAchievementId == achievement.Id)
                     StartCreate();
                 _message = achievement.AwardCount > 0
@@ -419,6 +474,94 @@ else
         {
             _isSaving = false;
         }
+    }
+
+    private async Task ToggleAwardsAsync(ManagedAchievement achievement)
+    {
+        if (_awardAchievementId == achievement.Id)
+        {
+            CloseAwards();
+            return;
+        }
+
+        _awardAchievementId = achievement.Id;
+        _awardAchievementTitle = achievement.Title;
+        _awards = [];
+        _awardsLoading = true;
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            var result = await JsRuntime.InvokeAsync<AchievementAwardsResult>(
+                "platformApi.getManagedAchievementAwards",
+                CourseId,
+                Year,
+                achievement.Id);
+            if (result.Success)
+                _awards = result.Awards ?? [];
+            else
+                _error = result.Message ?? "Не удалось загрузить список студентов.";
+        }
+        catch
+        {
+            _error = NetworkError;
+        }
+        finally
+        {
+            _awardsLoading = false;
+        }
+    }
+
+    private async Task RevokeAwardAsync(ManagedAward award)
+    {
+        if (!_awardAchievementId.HasValue ||
+            !await JsRuntime.InvokeAsync<bool>(
+                "confirm",
+                $"Отозвать ачивку у студента {award.StudentId}? Студент сможет получить её повторно."))
+        {
+            return;
+        }
+
+        ClearNotifications();
+        _isSaving = true;
+        try
+        {
+            var result = await JsRuntime.InvokeAsync<AchievementCommandResult>(
+                "platformApi.revokeManagedAchievementAward",
+                CourseId,
+                Year,
+                _awardAchievementId.Value,
+                award.StudentId);
+            if (result.Success && result.Achievement is not null)
+            {
+                _awards.RemoveAll(item => item.StudentId == award.StudentId);
+                Upsert(result.Achievement);
+                if (_selectedAchievementId == result.Achievement.Id)
+                    _selectedAchievement = result.Achievement;
+                _message = $"Ачивка отозвана у студента {award.StudentId}.";
+            }
+            else
+            {
+                _error = result.Message ?? "Не удалось отозвать ачивку у студента.";
+            }
+        }
+        catch
+        {
+            _error = NetworkError;
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void CloseAwards()
+    {
+        _awardAchievementId = null;
+        _awardAchievementTitle = string.Empty;
+        _awards = [];
+        _awardsLoading = false;
     }
 
     private async Task DeleteCriteriaAsync()
@@ -517,6 +660,11 @@ else
         public bool IsEnabled { get; set; }
     }
 
+    private sealed class ManagedAward
+    {
+        public Guid StudentId { get; set; }
+    }
+
     private sealed class AchievementListResult
     {
         public bool Success { get; set; }
@@ -529,5 +677,12 @@ else
         public bool Success { get; set; }
         public string? Message { get; set; }
         public ManagedAchievement? Achievement { get; set; }
+    }
+
+    private sealed class AchievementAwardsResult
+    {
+        public bool Success { get; set; }
+        public string? Message { get; set; }
+        public List<ManagedAward>? Awards { get; set; }
     }
 }

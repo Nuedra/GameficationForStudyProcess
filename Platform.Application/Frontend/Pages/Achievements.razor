@@ -36,11 +36,11 @@ else
     @if (_courses.Length > 1)
     {
         <div class="mb-3" style="max-width: 420px;">
-            <label for="courseSelect" class="form-label">Учебный год</label>
+            <label for="courseSelect" class="form-label">Курс</label>
             <select id="courseSelect" class="form-select" @onchange="OnCourseChangedAsync">
-                @foreach (var (course, idx) in _courses.Select((c, i) => (c, i)))
+                @foreach (var course in _courses)
                 {
-                    <option value="@($"{course.Id}:{course.Year}")">@CourseDisplayName(course, idx)</option>
+                    <option value="@($"{course.Id}:{course.Year}")">@course.Title</option>
                 }
             </select>
         </div>
@@ -203,14 +203,6 @@ else
             _graphLoading = false;
             StateHasChanged();
         }
-    }
-
-    private static readonly string[] CourseAliases = ["ДМ-5", "Информатика"];
-
-    private string CourseDisplayName(CourseInfo course, int index)
-    {
-        var alias = index < CourseAliases.Length ? CourseAliases[index] : course.Title;
-        return alias == "Информатика" ? $"Информатика {course.Year}" : alias;
     }
 
     private sealed class CourseInfo

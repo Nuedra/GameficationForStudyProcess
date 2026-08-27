@@ -38,6 +38,23 @@ public interface IAchievementManagementService
         bool revokeAwards,
         CancellationToken cancellationToken = default);
 
+    Task<AchievementManagementResult> GetAwardsAsync(
+        Guid userId,
+        UserRole role,
+        Guid courseId,
+        int year,
+        Guid achievementId,
+        CancellationToken cancellationToken = default);
+
+    Task<AchievementManagementResult> RevokeAwardAsync(
+        Guid userId,
+        UserRole role,
+        Guid courseId,
+        int year,
+        Guid achievementId,
+        Guid studentId,
+        CancellationToken cancellationToken = default);
+
     Task<AchievementManagementResult> SaveCriteriaAsync(
         Guid userId,
         UserRole role,
@@ -63,6 +80,7 @@ public enum AchievementManagementStatus
     CourseNotFound,
     AchievementNotFound,
     CriteriaNotFound,
+    AwardNotFound,
     InvalidAchievement,
     InvalidCriteria,
     DuplicateTitle,
@@ -73,4 +91,5 @@ public enum AchievementManagementStatus
 public sealed record AchievementManagementResult(
     AchievementManagementStatus Status,
     IReadOnlyList<ManagedAchievementDto>? Achievements = null,
-    ManagedAchievementDto? Achievement = null);
+    ManagedAchievementDto? Achievement = null,
+    IReadOnlyList<ManagedAchievementAwardDto>? Awards = null);

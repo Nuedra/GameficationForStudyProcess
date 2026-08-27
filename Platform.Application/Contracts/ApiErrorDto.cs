@@ -45,6 +45,9 @@ public static class ApiErrors
     public static readonly ApiErrorDto AchievementCriteriaNotFound =
         new("achievement_criteria_not_found", "Критерий достижения не найден.");
 
+    public static readonly ApiErrorDto AchievementAwardNotFound =
+        new("achievement_award_not_found", "У указанного студента нет этой ачивки.");
+
     public static readonly ApiErrorDto InvalidAchievement =
         new("invalid_achievement", "Проверьте название, описание и трек достижения.");
 

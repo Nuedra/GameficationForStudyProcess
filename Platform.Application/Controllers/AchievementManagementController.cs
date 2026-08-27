@@ -107,6 +107,54 @@ public sealed class AchievementManagementController(
             : ToErrorResult(result.Status);
     }
 
+    [HttpGet("{achievementId:guid}/awards")]
+    [ProducesResponseType(typeof(IReadOnlyList<ManagedAchievementAwardDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<ManagedAchievementAwardDto>>> GetAwards(
+        Guid courseId,
+        int year,
+        Guid achievementId,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetIdentity(out var userId, out var roleResult))
+            return Unauthorized(ApiErrors.AuthenticationRequired);
+
+        var result = await achievementManagementService.GetAwardsAsync(
+            userId,
+            roleResult,
+            courseId,
+            year,
+            achievementId,
+            cancellationToken);
+        return result.Status == AchievementManagementStatus.Success
+            ? Ok(result.Awards)
+            : ToErrorResult(result.Status);
+    }
+
+    [HttpDelete("{achievementId:guid}/awards/{studentId:guid}")]
+    [ProducesResponseType(typeof(ManagedAchievementDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ManagedAchievementDto>> RevokeAward(
+        Guid courseId,
+        int year,
+        Guid achievementId,
+        Guid studentId,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetIdentity(out var userId, out var roleResult))
+            return Unauthorized(ApiErrors.AuthenticationRequired);
+
+        var result = await achievementManagementService.RevokeAwardAsync(
+            userId,
+            roleResult,
+            courseId,
+            year,
+            achievementId,
+            studentId,
+            cancellationToken);
+        return result.Status == AchievementManagementStatus.Success
+            ? Ok(result.Achievement)
+            : ToErrorResult(result.Status);
+    }
+
     [HttpPut("{achievementId:guid}/criteria")]
     [ProducesResponseType(typeof(ManagedAchievementDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<ManagedAchievementDto>> SaveCriteria(
@@ -175,6 +223,8 @@ public sealed class AchievementManagementController(
                 NotFound(ApiErrors.AchievementNotFound),
             AchievementManagementStatus.CriteriaNotFound =>
                 NotFound(ApiErrors.AchievementCriteriaNotFound),
+            AchievementManagementStatus.AwardNotFound =>
+                NotFound(ApiErrors.AchievementAwardNotFound),
             AchievementManagementStatus.InvalidAchievement =>
                 BadRequest(ApiErrors.InvalidAchievement),
             AchievementManagementStatus.InvalidCriteria =>

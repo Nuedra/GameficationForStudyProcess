@@ -1,6 +1,3 @@
--- Demo data for the student frontend API.
--- Run after applying the local SQL bootstrap. Safe to rerun.
-
 BEGIN;
 
 DO $$
@@ -16,9 +13,6 @@ BEGIN
     END IF;
 END $$;
 
--- Keep demo achievement IDs aligned with AchivementId values in
--- Platform.Application/Templates/achievement-graph.xml. The template contains
--- IDs 1..50 and 52..55; 51 is intentionally absent.
 CREATE TEMP TABLE seed_achievement_ids (
     "Id" uuid PRIMARY KEY
 ) ON COMMIT DROP;
@@ -84,9 +78,12 @@ VALUES
 ON CONFLICT ("CourseID", "Year") DO UPDATE SET
     "ContentScopeID" = EXCLUDED."ContentScopeID";
 
--- Тестовый преподаватель назначен только на первый экземпляр курса.
--- Администратор получает доступ ко всем экземплярам по роли и не требует
--- отдельной строки назначения.
+
+DELETE FROM "course_instance_teachers"
+WHERE "CourseID" = 'a1000000-0000-0000-0000-000000000002'
+  AND "Year" = 2026
+  AND "PersonID" = 'b1000000-0000-0000-0000-000000000001';
+
 INSERT INTO "course_instance_teachers"
     ("CourseID", "Year", "PersonID", "StartDate", "EndDate", "IsLead")
 VALUES
@@ -165,7 +162,14 @@ ON CONFLICT ("CourseID", "Year", "PersonID") DO UPDATE SET
     "StartDate" = EXCLUDED."StartDate",
     "EndDate" = EXCLUDED."EndDate";
 
--- Students 1-5 and 13-20 are enrolled in the second course.
+DELETE FROM "course_instance_students"
+WHERE "CourseID" = 'a1000000-0000-0000-0000-000000000002'
+  AND "Year" = 2026
+  AND "PersonID" IN (
+      SELECT ('b0000000-0000-0000-0000-' || lpad(number::text, 12, '0'))::uuid
+      FROM generate_series(1, 12) AS number
+  );
+
 INSERT INTO "course_instance_students"
     ("CourseID", "Year", "PersonID", "StartDate", "EndDate")
 SELECT
@@ -175,8 +179,6 @@ SELECT
     TIMESTAMPTZ '2026-02-01T00:00:00Z',
     NULL
 FROM (
-    SELECT generate_series(1, 5) AS number
-    UNION ALL
     SELECT generate_series(13, 20) AS number
 ) AS enrolled
 ON CONFLICT ("CourseID", "Year", "PersonID") DO UPDATE SET
@@ -358,9 +360,6 @@ FROM seed_template_edges
 ON CONFLICT ("SourceId", "TargetId") DO UPDATE SET
     "Id" = EXCLUDED."Id";
 
--- Canonical refresh scenario: student b000...001 starts with achievements 1
--- and 2. The fixed demo appraisal provider returns template_achievement_3,
--- so POST .../graph/refresh assigns achievement 3 exactly once.
 INSERT INTO "student_achievements"
     ("Id", "AchievementGotDate", "AchievementFoundDate", "IsNotificationSeen",
      "IsFirstAnimationShown", "LabID", "AchievementID", "StudentID")

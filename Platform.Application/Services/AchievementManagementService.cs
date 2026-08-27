@@ -201,6 +201,89 @@ public sealed class AchievementManagementService(
         return new AchievementManagementResult(AchievementManagementStatus.Success);
     }
 
+    public async Task<AchievementManagementResult> GetAwardsAsync(
+        Guid userId,
+        UserRole role,
+        Guid courseId,
+        int year,
+        Guid achievementId,
+        CancellationToken cancellationToken = default)
+    {
+        var accessStatus = await GetAccessStatusAsync(
+            userId,
+            role,
+            courseId,
+            year,
+            cancellationToken);
+        if (accessStatus != AchievementManagementStatus.Success)
+            return new AchievementManagementResult(accessStatus);
+
+        if (await FindAchievementAsync(courseId, year, achievementId, cancellationToken) is null)
+            return new AchievementManagementResult(AchievementManagementStatus.AchievementNotFound);
+
+        var awards = await dbContext.StudentAchievements
+            .AsNoTracking()
+            .Where(item => item.AchievementID == achievementId)
+            .OrderBy(item => item.StudentID)
+            .Select(item => new ManagedAchievementAwardDto(item.StudentID))
+            .ToListAsync(cancellationToken);
+
+        return new AchievementManagementResult(
+            AchievementManagementStatus.Success,
+            Awards: awards);
+    }
+
+    public async Task<AchievementManagementResult> RevokeAwardAsync(
+        Guid userId,
+        UserRole role,
+        Guid courseId,
+        int year,
+        Guid achievementId,
+        Guid studentId,
+        CancellationToken cancellationToken = default)
+    {
+        var accessStatus = await GetAccessStatusAsync(
+            userId,
+            role,
+            courseId,
+            year,
+            cancellationToken);
+        if (accessStatus != AchievementManagementStatus.Success)
+            return new AchievementManagementResult(accessStatus);
+
+        var achievement = await FindAchievementAsync(
+            courseId,
+            year,
+            achievementId,
+            cancellationToken);
+        if (achievement is null)
+            return new AchievementManagementResult(AchievementManagementStatus.AchievementNotFound);
+
+        var award = await dbContext.StudentAchievements.SingleOrDefaultAsync(
+            item =>
+                item.AchievementID == achievementId &&
+                item.StudentID == studentId,
+            cancellationToken);
+        if (award is null)
+            return new AchievementManagementResult(AchievementManagementStatus.AwardNotFound);
+
+        dbContext.StudentAchievements.Remove(award);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        logger.LogInformation(
+            "Achievement award revoked. UserId={UserId}, Role={Role}, CourseId={CourseId}, Year={Year}, AchievementId={AchievementId}, StudentId={StudentId}",
+            userId,
+            role,
+            courseId,
+            year,
+            achievementId,
+            studentId);
+
+        return new AchievementManagementResult(
+            AchievementManagementStatus.Success,
+            Achievement: await BuildDtoAsync(achievement, cancellationToken));
+    }
+
     public async Task<AchievementManagementResult> SaveCriteriaAsync(
         Guid userId,
         UserRole role,
