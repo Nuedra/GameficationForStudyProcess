@@ -136,12 +136,14 @@ application_pid=$!
 wait_for_readiness
 
 student_id="b0000000-0000-0000-0000-000000000001"
+second_student_id="b0000000-0000-0000-0000-000000000002"
 restricted_student_id="b0000000-0000-0000-0000-000000000006"
 teacher_id="b1000000-0000-0000-0000-000000000001"
 administrator_id="b2000000-0000-0000-0000-000000000001"
 course_id="a1000000-0000-0000-0000-000000000001"
 foreign_course_id="a1000000-0000-0000-0000-000000000002"
 missing_course_id="a1000000-0000-0000-0000-000000000099"
+achievement_one_id="00000000-0000-0000-0000-000000000001"
 achievement_three_id="00000000-0000-0000-0000-000000000003"
 
 echo "Checking unauthenticated and invalid-login responses..."
@@ -247,6 +249,38 @@ expect_status 403 \
     --cookie "$teacher_cookie" \
     "$base_url/api/staff/courses/$foreign_course_id/2026"
 expect_body_contains '"code":"course_access_denied"'
+
+echo "Checking achievement award listing, revocation and re-awarding..."
+teacher_csrf_token="$(get_csrf_token "$teacher_cookie")"
+expect_status 200 \
+    --cookie "$teacher_cookie" \
+    "$base_url/api/staff/courses/$course_id/2026/achievements/$achievement_one_id/awards"
+expect_body_contains "$student_id"
+expect_body_contains "$second_student_id"
+
+expect_status 200 \
+    --cookie "$teacher_cookie" \
+    --header "X-CSRF-TOKEN: $teacher_csrf_token" \
+    --request DELETE \
+    "$base_url/api/staff/courses/$course_id/2026/achievements/$achievement_three_id/awards/$student_id"
+expect_body_contains '"awardCount":0'
+
+student_csrf_token="$(get_csrf_token "$student_cookie")"
+expect_status 200 \
+    --cookie "$student_cookie" \
+    --cookie-jar "$student_cookie" \
+    --header "Content-Type: application/json" \
+    --header "X-CSRF-TOKEN: $student_csrf_token" \
+    --data "{\"id\":\"$student_id\"}" \
+    "$base_url/api/auth/login"
+student_csrf_token="$(get_csrf_token "$student_cookie")"
+expect_status 200 \
+    --cookie "$student_cookie" \
+    --header "Accept: application/xml" \
+    --header "X-CSRF-TOKEN: $student_csrf_token" \
+    --request POST \
+    "$base_url/api/student/courses/$course_id/2026/achievements/graph/refresh"
+expect_node_state "$achievement_three_id" "earned"
 
 expect_status 200 \
     --cookie "$administrator_cookie" \

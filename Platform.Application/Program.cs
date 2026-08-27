@@ -133,6 +133,7 @@ builder.Services.AddScoped<ILmsTeachingAssignmentDataSource>(serviceProvider =>
     serviceProvider.GetRequiredService<LocalLmsDataSource>());
 builder.Services.AddSingleton<IAccessPolicyService, AccessPolicyService>();
 builder.Services.AddScoped<IUserIdentityService, UserIdentityService>();
+builder.Services.AddScoped<IUserSessionService, UserSessionService>();
 builder.Services.AddScoped<IStudentCourseService, StudentCourseService>();
 builder.Services.AddScoped<IStaffCourseService, StaffCourseService>();
 builder.Services.AddScoped<ITeachingAssignmentService, TeachingAssignmentService>();

@@ -1,6 +1,7 @@
 @page "/staff/courses"
 @attribute [Authorize(Roles = "teacher,administrator")]
-@inject IJSRuntime JsRuntime
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IStaffCourseService StaffCourseService
 
 <PageTitle>Курсы кабинета — Платформа достижений</PageTitle>
 
@@ -23,7 +24,7 @@ else if (_error is not null)
         <button class="btn btn-outline-danger btn-sm ms-2" @onclick="LoadCoursesAsync">Повторить</button>
     </div>
 }
-else if (_courses is null || _courses.Length == 0)
+else if (_courses is null || _courses.Count == 0)
 {
     <div class="alert alert-info mt-3">
         Доступные экземпляры курсов не найдены.
@@ -60,13 +61,12 @@ else
 
 @code {
     private bool _isLoading = true;
-    private CourseInfo[]? _courses;
+    private IReadOnlyList<CourseDto>? _courses;
     private string? _error;
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override async Task OnInitializedAsync()
     {
-        if (firstRender)
-            await LoadCoursesAsync();
+        await LoadCoursesAsync();
     }
 
     private async Task LoadCoursesAsync()
@@ -77,35 +77,28 @@ else
 
         try
         {
-            var result = await JsRuntime.InvokeAsync<CoursesResult>("platformApi.getStaffCourses");
-            if (result.Success)
+            var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authenticationState.User;
+            if (!user.TryGetUserId(out var userId) || !user.TryGetUserRole(out var role))
+            {
+                _error = "Не удалось определить текущего пользователя.";
+                return;
+            }
+
+            var result = await StaffCourseService.GetCoursesAsync(userId, role);
+            if (result.Status == StaffCourseQueryStatus.Success)
                 _courses = result.Courses;
             else
-                _error = result.Message ?? "Не удалось загрузить курсы кабинета.";
+                _error = "У вас нет доступа к списку курсов.";
         }
         catch
         {
-            _error = "Не удалось связаться с сервером. Проверьте подключение и повторите запрос.";
+            _error = "Не удалось загрузить курсы кабинета.";
         }
         finally
         {
             _isLoading = false;
-            StateHasChanged();
         }
     }
 
-    private sealed class CourseInfo
-    {
-        public Guid Id { get; set; }
-        public string Title { get; set; } = string.Empty;
-        public string Description { get; set; } = string.Empty;
-        public int Year { get; set; }
-    }
-
-    private sealed class CoursesResult
-    {
-        public bool Success { get; set; }
-        public string? Message { get; set; }
-        public CourseInfo[]? Courses { get; set; }
-    }
 }

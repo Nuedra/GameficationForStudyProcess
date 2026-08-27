@@ -1,5 +1,24 @@
 (function () {
     const mountedApps = new Map();
+    let csrfToken = null;
+
+    async function protectedGraphFetch(url, options) {
+        if (!csrfToken) {
+            const tokenResponse = await fetch('/api/auth/csrf', { credentials: 'include' });
+            if (!tokenResponse.ok)
+                throw new Error('Не удалось получить CSRF-токен графа.');
+            csrfToken = (await tokenResponse.json()).token;
+        }
+
+        return await fetch(url, {
+            ...options,
+            credentials: 'include',
+            headers: {
+                ...(options?.headers || {}),
+                'X-CSRF-TOKEN': csrfToken
+            }
+        });
+    }
 
     async function render(elementId, courseId, year, width, height) {
         return await loadGraph(elementId, courseId, year, width, height, false);
@@ -38,7 +57,7 @@
                 headers: { Accept: "application/xml" }
             };
             const response = useRefresh
-                ? await window.platformApi.protectedFetch(url, requestOptions)
+                ? await protectedGraphFetch(url, requestOptions)
                 : await fetch(url, requestOptions);
 
             if (!response.ok) {

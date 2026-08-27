@@ -1,6 +1,7 @@
 @page "/courses"
 @attribute [Authorize(Roles = "student")]
-@inject IJSRuntime JsRuntime
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IStudentCourseService StudentCourseService
 
 <PageTitle>Курсы — Платформа достижений</PageTitle>
 
@@ -27,7 +28,7 @@ else if (!_isAuthenticated)
         Необходимо <a href="login">войти в систему</a>, чтобы просматривать курсы.
     </div>
 }
-else if (_courses == null || _courses.Length == 0)
+else if (_courses == null || _courses.Count == 0)
 {
     <div class="alert alert-info mt-3">
         Курсы не найдены. Обратитесь к администратору.
@@ -65,13 +66,11 @@ else
 @code {
     private bool _isLoading = true;
     private bool _isAuthenticated;
-    private CourseInfo[]? _courses;
+    private IReadOnlyList<CourseDto>? _courses;
     private string? _error;
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override async Task OnInitializedAsync()
     {
-        if (!firstRender) return;
-
         await LoadCoursesAsync();
     }
 
@@ -83,55 +82,24 @@ else
 
         try
         {
-            var session = await JsRuntime.InvokeAsync<SessionResult>("platformApi.getCurrentUser");
-            _isAuthenticated = session.Success;
-            if (!session.Success)
+            var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            if (!authenticationState.User.TryGetUserId(out var studentId))
             {
-                if (session.Status != 401)
-                    _error = session.Message ?? "Не удалось проверить сессию.";
+                _isAuthenticated = false;
                 return;
             }
 
-            var result = await JsRuntime.InvokeAsync<CoursesResult>("platformApi.getCourses");
-            if (result.Success)
-                _courses = result.Courses;
-            else
-            {
-                _isAuthenticated = result.Status == 401 ? false : _isAuthenticated;
-                _error = result.Message ?? "Не удалось загрузить список курсов.";
-            }
+            _isAuthenticated = true;
+            _courses = await StudentCourseService.GetCoursesAsync(studentId);
         }
         catch
         {
-            _error = "Не удалось связаться с сервером. Проверьте подключение и повторите запрос.";
+            _error = "Не удалось загрузить список курсов.";
         }
         finally
         {
             _isLoading = false;
-            StateHasChanged();
         }
     }
 
-    private sealed class CourseInfo
-    {
-        public Guid Id { get; set; }
-        public string Title { get; set; } = "";
-        public string Description { get; set; } = "";
-        public int Year { get; set; }
-    }
-
-    private sealed class SessionResult
-    {
-        public bool Success { get; set; }
-        public int Status { get; set; }
-        public string? Message { get; set; }
-    }
-
-    private sealed class CoursesResult
-    {
-        public bool Success { get; set; }
-        public int Status { get; set; }
-        public string? Message { get; set; }
-        public CourseInfo[]? Courses { get; set; }
-    }
 }

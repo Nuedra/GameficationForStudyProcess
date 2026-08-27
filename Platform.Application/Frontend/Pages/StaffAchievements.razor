@@ -1,6 +1,7 @@
 @page "/staff/courses/{CourseId:guid}/{Year:int}/achievements"
 @attribute [Authorize(Roles = "teacher,administrator")]
-@inject IJSRuntime JsRuntime
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IAchievementManagementService AchievementManagementService
 
 <PageTitle>Достижения курса — Платформа достижений</PageTitle>
 
@@ -29,6 +30,39 @@ else
     @if (_message is not null)
     {
         <div class="alert alert-success">@_message</div>
+    }
+    @if (_achievementToDelete is not null)
+    {
+        <div class="alert alert-warning d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <span>
+                @if (_achievementToDelete.AwardCount > 0)
+                {
+                    @($"Удалить «{_achievementToDelete.Title}» и отозвать его у {_achievementToDelete.AwardCount} студентов?")
+                }
+                else
+                {
+                    @($"Удалить достижение «{_achievementToDelete.Title}»?")
+                }
+            </span>
+            <span class="d-flex gap-2">
+                <button class="btn btn-sm btn-danger" disabled="@_isSaving"
+                        @onclick="ConfirmDeleteAchievementAsync">Удалить</button>
+                <button class="btn btn-sm btn-outline-secondary" disabled="@_isSaving"
+                        @onclick="CancelDeleteAchievement">Отмена</button>
+            </span>
+        </div>
+    }
+    @if (_awardToRevoke is not null)
+    {
+        <div class="alert alert-warning d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <span>Отозвать ачивку у студента <code>@_awardToRevoke.StudentId</code>? Студент сможет получить её повторно.</span>
+            <span class="d-flex gap-2">
+                <button class="btn btn-sm btn-danger" disabled="@_isSaving"
+                        @onclick="ConfirmRevokeAwardAsync">Отозвать</button>
+                <button class="btn btn-sm btn-outline-secondary" disabled="@_isSaving"
+                        @onclick="CancelRevokeAward">Отмена</button>
+            </span>
+        </div>
     }
 
     <div class="row g-4">
@@ -101,7 +135,7 @@ else
                                                 <button class="btn btn-sm btn-outline-danger"
                                                         disabled="@(achievement.HasDependencies || _isSaving)"
                                                         title="@(achievement.HasDependencies ? "Сначала удалите связи графа" : null)"
-                                                        @onclick="() => DeleteAchievementAsync(achievement)">
+                                                        @onclick="() => RequestDeleteAchievement(achievement)">
                                                     Удалить
                                                 </button>
                                             </td>
@@ -141,7 +175,7 @@ else
                                             <code>@award.StudentId</code>
                                             <button type="button" class="btn btn-sm btn-outline-danger"
                                                     disabled="@_isSaving"
-                                                    @onclick="() => RevokeAwardAsync(award)">
+                                                    @onclick="() => RequestRevokeAward(award)">
                                                 Отозвать
                                             </button>
                                         </div>
@@ -218,9 +252,9 @@ else
                         <div class="mb-3">
                             <label class="form-label" for="criteria-scope">Область проверки</label>
                             <select id="criteria-scope" class="form-select" @bind="_criteriaScope">
-                                <option value="sameMark">Одна отметка</option>
-                                <option value="acrossCourse">Весь курс</option>
-                                <option value="allLabs">Все лабораторные</option>
+                                <option value="SameMark">Одна отметка</option>
+                                <option value="AcrossCourse">Весь курс</option>
+                                <option value="AllLabs">Все лабораторные</option>
                             </select>
                         </div>
                         <div class="form-check mb-3">
@@ -233,11 +267,23 @@ else
                             </button>
                             @if (_selectedAchievement?.Criteria is not null)
                             {
-                                <button class="btn btn-outline-danger" disabled="@_isSaving" @onclick="DeleteCriteriaAsync">
+                                <button class="btn btn-outline-danger" disabled="@_isSaving" @onclick="RequestDeleteCriteria">
                                     Удалить критерий
                                 </button>
                             }
                         </div>
+                        @if (_confirmCriteriaDelete)
+                        {
+                            <div class="alert alert-warning mt-3 mb-0">
+                                <p>Удалить критерий? Достижение перестанет выдаваться автоматически.</p>
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-sm btn-danger" disabled="@_isSaving"
+                                            @onclick="ConfirmDeleteCriteriaAsync">Удалить</button>
+                                    <button class="btn btn-sm btn-outline-secondary" disabled="@_isSaving"
+                                            @onclick="CancelDeleteCriteria">Отмена</button>
+                                </div>
+                            </div>
+                        }
                     </div>
                 </div>
             }
@@ -251,52 +297,66 @@ else
 
     private bool _isLoading = true;
     private bool _isSaving;
+    private Guid _currentUserId;
+    private UserRole _currentRole;
     private string? _error;
     private string? _message;
     private string _search = string.Empty;
-    private List<ManagedAchievement> _achievements = [];
+    private List<ManagedAchievementDto> _achievements = [];
     private Guid? _selectedAchievementId;
-    private ManagedAchievement? _selectedAchievement;
+    private ManagedAchievementDto? _selectedAchievement;
     private string _title = string.Empty;
     private string _description = string.Empty;
     private string _rarity = "common";
     private string _track = "default";
     private string _labId = string.Empty;
     private string _criteriaExpression = string.Empty;
-    private string _criteriaScope = "sameMark";
+    private string _criteriaScope = "SameMark";
     private bool _criteriaEnabled = true;
     private Guid? _awardAchievementId;
     private string _awardAchievementTitle = string.Empty;
     private bool _awardsLoading;
-    private List<ManagedAward> _awards = [];
+    private List<ManagedAchievementAwardDto> _awards = [];
+    private ManagedAchievementDto? _achievementToDelete;
+    private ManagedAchievementAwardDto? _awardToRevoke;
+    private bool _confirmCriteriaDelete;
 
-    private List<ManagedAchievement> FilteredAchievements => _achievements
+    private List<ManagedAchievementDto> FilteredAchievements => _achievements
         .Where(achievement => string.IsNullOrWhiteSpace(_search) ||
             achievement.Title.Contains(_search, StringComparison.CurrentCultureIgnoreCase))
         .ToList();
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override async Task OnInitializedAsync()
     {
-        if (firstRender)
-            await LoadAsync();
+        var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (!authenticationState.User.TryGetUserId(out _currentUserId) ||
+            !authenticationState.User.TryGetUserRole(out _currentRole))
+        {
+            _error = "Не удалось определить текущего пользователя.";
+            _isLoading = false;
+            return;
+        }
+
+        await LoadAsync();
     }
 
     private async Task LoadAsync()
     {
         try
         {
-            var result = await JsRuntime.InvokeAsync<AchievementListResult>(
-                "platformApi.getManagedAchievements",
+            var result = await AchievementManagementService.GetAllAsync(
+                _currentUserId,
+                _currentRole,
                 CourseId,
                 Year);
-            if (result.Success)
-                _achievements = result.Achievements ?? [];
+            if (result.Status == AchievementManagementStatus.Success)
+                _achievements = result.Achievements?.ToList() ?? [];
             else
-                _error = result.Message ?? "Не удалось загрузить достижения курса.";
+                _error = AchievementError(result.Status, "Не удалось загрузить достижения курса.");
         }
         catch
         {
-            _error = NetworkError;
+            _error = "Не удалось загрузить достижения курса.";
         }
         finally
         {
@@ -318,17 +378,17 @@ else
         ClearNotifications();
     }
 
-    private void SelectAchievement(ManagedAchievement achievement)
+    private void SelectAchievement(ManagedAchievementDto achievement)
     {
         _selectedAchievementId = achievement.Id;
         _selectedAchievement = achievement;
         _title = achievement.Title;
         _description = achievement.Description;
-        _rarity = achievement.Rarity;
+        _rarity = achievement.Rarity.ToString().ToLowerInvariant();
         _track = achievement.Track;
         _labId = achievement.LabId?.ToString() ?? string.Empty;
         _criteriaExpression = achievement.Criteria?.Expression ?? string.Empty;
-        _criteriaScope = achievement.Criteria?.Scope ?? "sameMark";
+        _criteriaScope = achievement.Criteria?.Scope.ToString() ?? "SameMark";
         _criteriaEnabled = achievement.Criteria?.IsEnabled ?? true;
         ClearNotifications();
     }
@@ -352,25 +412,36 @@ else
             }
             labId = parsedLabId;
         }
+        if (!Enum.TryParse<AchievementRarity>(_rarity, true, out var rarity))
+        {
+            _error = "Выберите корректную редкость достижения.";
+            return;
+        }
 
         _isSaving = true;
         try
         {
-            var request = new
-            {
-                title = _title,
-                description = _description,
-                rarity = _rarity,
-                track = _track,
-                labId
-            };
-            var result = await JsRuntime.InvokeAsync<AchievementCommandResult>(
-                "platformApi.saveManagedAchievement",
-                CourseId,
-                Year,
-                _selectedAchievementId,
-                request);
-            if (result.Success && result.Achievement is not null)
+            var request = new SaveAchievementRequest(
+                _title,
+                _description,
+                rarity,
+                _track,
+                labId);
+            var result = _selectedAchievementId.HasValue
+                ? await AchievementManagementService.UpdateAsync(
+                    _currentUserId,
+                    _currentRole,
+                    CourseId,
+                    Year,
+                    _selectedAchievementId.Value,
+                    request)
+                : await AchievementManagementService.CreateAsync(
+                    _currentUserId,
+                    _currentRole,
+                    CourseId,
+                    Year,
+                    request);
+            if (result.Status == AchievementManagementStatus.Success && result.Achievement is not null)
             {
                 Upsert(result.Achievement);
                 SelectAchievement(result.Achievement);
@@ -378,12 +449,12 @@ else
             }
             else
             {
-                _error = result.Message ?? "Не удалось сохранить достижение.";
+                _error = AchievementError(result.Status, "Не удалось сохранить достижение.");
             }
         }
         catch
         {
-            _error = NetworkError;
+            _error = "Не удалось сохранить достижение.";
         }
         finally
         {
@@ -397,21 +468,25 @@ else
             return;
 
         ClearNotifications();
+        if (!Enum.TryParse<AchievementCriteriaScope>(_criteriaScope, true, out var criteriaScope))
+        {
+            _error = "Выберите корректную область проверки.";
+            return;
+        }
         _isSaving = true;
         try
         {
-            var result = await JsRuntime.InvokeAsync<AchievementCommandResult>(
-                "platformApi.saveManagedAchievementCriteria",
+            var result = await AchievementManagementService.SaveCriteriaAsync(
+                _currentUserId,
+                _currentRole,
                 CourseId,
                 Year,
                 _selectedAchievementId.Value,
-                new
-                {
-                    expression = _criteriaExpression,
-                    scope = _criteriaScope,
-                    isEnabled = _criteriaEnabled
-                });
-            if (result.Success && result.Achievement is not null)
+                new SaveAchievementCriteriaRequest(
+                    _criteriaExpression,
+                    criteriaScope,
+                    _criteriaEnabled));
+            if (result.Status == AchievementManagementStatus.Success && result.Achievement is not null)
             {
                 Upsert(result.Achievement);
                 SelectAchievement(result.Achievement);
@@ -419,12 +494,12 @@ else
             }
             else
             {
-                _error = result.Message ?? "Не удалось сохранить критерий.";
+                _error = AchievementError(result.Status, "Не удалось сохранить критерий.");
             }
         }
         catch
         {
-            _error = NetworkError;
+            _error = "Не удалось сохранить критерий.";
         }
         finally
         {
@@ -432,27 +507,39 @@ else
         }
     }
 
-    private async Task DeleteAchievementAsync(ManagedAchievement achievement)
+    private void RequestDeleteAchievement(ManagedAchievementDto achievement)
     {
-        var warning = achievement.AwardCount > 0
-            ? $"Удалить «{achievement.Title}» и отозвать его у {achievement.AwardCount} студентов?"
-            : $"Удалить достижение «{achievement.Title}»?";
-        if (!await JsRuntime.InvokeAsync<bool>("confirm", warning))
+        _achievementToDelete = achievement;
+        _awardToRevoke = null;
+        ClearNotifications();
+    }
+
+    private void CancelDeleteAchievement()
+    {
+        _achievementToDelete = null;
+    }
+
+    private async Task ConfirmDeleteAchievementAsync()
+    {
+        if (_achievementToDelete is null)
             return;
 
+        var achievement = _achievementToDelete;
         ClearNotifications();
         _isSaving = true;
         try
         {
-            var result = await JsRuntime.InvokeAsync<AchievementCommandResult>(
-                "platformApi.deleteManagedAchievement",
+            var result = await AchievementManagementService.DeleteAsync(
+                _currentUserId,
+                _currentRole,
                 CourseId,
                 Year,
                 achievement.Id,
                 achievement.AwardCount > 0);
-            if (result.Success)
+            if (result.Status == AchievementManagementStatus.Success)
             {
                 _achievements.RemoveAll(item => item.Id == achievement.Id);
+                _achievementToDelete = null;
                 if (_awardAchievementId == achievement.Id)
                     CloseAwards();
                 if (_selectedAchievementId == achievement.Id)
@@ -463,12 +550,12 @@ else
             }
             else
             {
-                _error = result.Message ?? "Не удалось удалить достижение.";
+                _error = AchievementError(result.Status, "Не удалось удалить достижение.");
             }
         }
         catch
         {
-            _error = NetworkError;
+            _error = "Не удалось удалить достижение.";
         }
         finally
         {
@@ -476,7 +563,7 @@ else
         }
     }
 
-    private async Task ToggleAwardsAsync(ManagedAchievement achievement)
+    private async Task ToggleAwardsAsync(ManagedAchievementDto achievement)
     {
         if (_awardAchievementId == achievement.Id)
         {
@@ -493,19 +580,20 @@ else
 
         try
         {
-            var result = await JsRuntime.InvokeAsync<AchievementAwardsResult>(
-                "platformApi.getManagedAchievementAwards",
+            var result = await AchievementManagementService.GetAwardsAsync(
+                _currentUserId,
+                _currentRole,
                 CourseId,
                 Year,
                 achievement.Id);
-            if (result.Success)
-                _awards = result.Awards ?? [];
+            if (result.Status == AchievementManagementStatus.Success)
+                _awards = result.Awards?.ToList() ?? [];
             else
-                _error = result.Message ?? "Не удалось загрузить список студентов.";
+                _error = AchievementError(result.Status, "Не удалось загрузить список студентов.");
         }
         catch
         {
-            _error = NetworkError;
+            _error = "Не удалось загрузить список студентов.";
         }
         finally
         {
@@ -513,29 +601,39 @@ else
         }
     }
 
-    private async Task RevokeAwardAsync(ManagedAward award)
+    private void RequestRevokeAward(ManagedAchievementAwardDto award)
     {
-        if (!_awardAchievementId.HasValue ||
-            !await JsRuntime.InvokeAsync<bool>(
-                "confirm",
-                $"Отозвать ачивку у студента {award.StudentId}? Студент сможет получить её повторно."))
-        {
-            return;
-        }
+        _awardToRevoke = award;
+        _achievementToDelete = null;
+        ClearNotifications();
+    }
 
+    private void CancelRevokeAward()
+    {
+        _awardToRevoke = null;
+    }
+
+    private async Task ConfirmRevokeAwardAsync()
+    {
+        if (!_awardAchievementId.HasValue || _awardToRevoke is null)
+            return;
+
+        var award = _awardToRevoke;
         ClearNotifications();
         _isSaving = true;
         try
         {
-            var result = await JsRuntime.InvokeAsync<AchievementCommandResult>(
-                "platformApi.revokeManagedAchievementAward",
+            var result = await AchievementManagementService.RevokeAwardAsync(
+                _currentUserId,
+                _currentRole,
                 CourseId,
                 Year,
                 _awardAchievementId.Value,
                 award.StudentId);
-            if (result.Success && result.Achievement is not null)
+            if (result.Status == AchievementManagementStatus.Success && result.Achievement is not null)
             {
                 _awards.RemoveAll(item => item.StudentId == award.StudentId);
+                _awardToRevoke = null;
                 Upsert(result.Achievement);
                 if (_selectedAchievementId == result.Achievement.Id)
                     _selectedAchievement = result.Achievement;
@@ -543,12 +641,12 @@ else
             }
             else
             {
-                _error = result.Message ?? "Не удалось отозвать ачивку у студента.";
+                _error = AchievementError(result.Status, "Не удалось отозвать ачивку у студента.");
             }
         }
         catch
         {
-            _error = NetworkError;
+            _error = "Не удалось отозвать ачивку у студента.";
         }
         finally
         {
@@ -562,39 +660,50 @@ else
         _awardAchievementTitle = string.Empty;
         _awards = [];
         _awardsLoading = false;
+        _awardToRevoke = null;
     }
 
-    private async Task DeleteCriteriaAsync()
+    private void RequestDeleteCriteria()
     {
-        if (!_selectedAchievementId.HasValue ||
-            !await JsRuntime.InvokeAsync<bool>("confirm", "Удалить критерий? Достижение перестанет выдаваться автоматически."))
-        {
+        if (_selectedAchievementId.HasValue)
+            _confirmCriteriaDelete = true;
+    }
+
+    private void CancelDeleteCriteria()
+    {
+        _confirmCriteriaDelete = false;
+    }
+
+    private async Task ConfirmDeleteCriteriaAsync()
+    {
+        if (!_selectedAchievementId.HasValue)
             return;
-        }
 
         ClearNotifications();
         _isSaving = true;
         try
         {
-            var result = await JsRuntime.InvokeAsync<AchievementCommandResult>(
-                "platformApi.deleteManagedAchievementCriteria",
+            var result = await AchievementManagementService.DeleteCriteriaAsync(
+                _currentUserId,
+                _currentRole,
                 CourseId,
                 Year,
                 _selectedAchievementId.Value);
-            if (result.Success && result.Achievement is not null)
+            if (result.Status == AchievementManagementStatus.Success && result.Achievement is not null)
             {
+                _confirmCriteriaDelete = false;
                 Upsert(result.Achievement);
                 SelectAchievement(result.Achievement);
                 _message = "Критерий удалён.";
             }
             else
             {
-                _error = result.Message ?? "Не удалось удалить критерий.";
+                _error = AchievementError(result.Status, "Не удалось удалить критерий.");
             }
         }
         catch
         {
-            _error = NetworkError;
+            _error = "Не удалось удалить критерий.";
         }
         finally
         {
@@ -602,7 +711,7 @@ else
         }
     }
 
-    private void Upsert(ManagedAchievement achievement)
+    private void Upsert(ManagedAchievementDto achievement)
     {
         var index = _achievements.FindIndex(item => item.Id == achievement.Id);
         if (index >= 0)
@@ -615,8 +724,9 @@ else
     private void ResetCriteria()
     {
         _criteriaExpression = string.Empty;
-        _criteriaScope = "sameMark";
+        _criteriaScope = "SameMark";
         _criteriaEnabled = true;
+        _confirmCriteriaDelete = false;
     }
 
     private void ClearNotifications()
@@ -625,64 +735,31 @@ else
         _message = null;
     }
 
-    private static string RarityLabel(string rarity) => rarity switch
+    private static string RarityLabel(AchievementRarity rarity) => rarity switch
     {
-        "rare" => "Редкая",
-        "epic" => "Эпическая",
-        "legendary" => "Легендарная",
+        AchievementRarity.Rare => "Редкая",
+        AchievementRarity.Epic => "Эпическая",
+        AchievementRarity.Legendary => "Легендарная",
         _ => "Обычная"
     };
 
-    private const string NetworkError =
-        "Не удалось связаться с сервером. Проверьте подключение и повторите запрос.";
-
-    private sealed class ManagedAchievement
+    private static string AchievementError(
+        AchievementManagementStatus status,
+        string fallback)
     {
-        public Guid Id { get; set; }
-        public string Title { get; set; } = string.Empty;
-        public string Description { get; set; } = string.Empty;
-        public string Rarity { get; set; } = "common";
-        public string Track { get; set; } = "default";
-        public Guid? LabId { get; set; }
-        public Guid CourseId { get; set; }
-        public int Year { get; set; }
-        public bool HasAwards { get; set; }
-        public int AwardCount { get; set; }
-        public bool HasDependencies { get; set; }
-        public ManagedCriteria? Criteria { get; set; }
-    }
-
-    private sealed class ManagedCriteria
-    {
-        public Guid Id { get; set; }
-        public string Expression { get; set; } = string.Empty;
-        public string Scope { get; set; } = "sameMark";
-        public bool IsEnabled { get; set; }
-    }
-
-    private sealed class ManagedAward
-    {
-        public Guid StudentId { get; set; }
-    }
-
-    private sealed class AchievementListResult
-    {
-        public bool Success { get; set; }
-        public string? Message { get; set; }
-        public List<ManagedAchievement>? Achievements { get; set; }
-    }
-
-    private sealed class AchievementCommandResult
-    {
-        public bool Success { get; set; }
-        public string? Message { get; set; }
-        public ManagedAchievement? Achievement { get; set; }
-    }
-
-    private sealed class AchievementAwardsResult
-    {
-        public bool Success { get; set; }
-        public string? Message { get; set; }
-        public List<ManagedAward>? Awards { get; set; }
+        return status switch
+        {
+            AchievementManagementStatus.AccessDenied => "У вас нет доступа к достижениям этого курса.",
+            AchievementManagementStatus.CourseNotFound => "Экземпляр курса не найден.",
+            AchievementManagementStatus.AchievementNotFound => "Достижение не найдено.",
+            AchievementManagementStatus.CriteriaNotFound => "Критерий достижения не найден.",
+            AchievementManagementStatus.AwardNotFound => "У указанного студента уже нет этой ачивки.",
+            AchievementManagementStatus.InvalidAchievement => "Проверьте название, описание и трек достижения.",
+            AchievementManagementStatus.InvalidCriteria => "Критерий должен содержать хотя бы один тег.",
+            AchievementManagementStatus.DuplicateTitle => "В этом курсе уже есть достижение с таким названием.",
+            AchievementManagementStatus.AwardsConfirmationRequired => "Подтвердите отзыв всех выдач.",
+            AchievementManagementStatus.HasDependencies => "Сначала удалите связи достижения в графе.",
+            _ => fallback
+        };
     }
 }

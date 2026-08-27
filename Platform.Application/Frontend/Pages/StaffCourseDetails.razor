@@ -1,7 +1,8 @@
 @page "/staff/courses/{CourseId:guid}/{Year:int}"
 @attribute [Authorize(Roles = "teacher,administrator")]
-@inject IJSRuntime JsRuntime
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IStaffCourseService StaffCourseService
+@inject ITeachingAssignmentService TeachingAssignmentService
 
 <PageTitle>Кабинет курса — Платформа достижений</PageTitle>
 
@@ -91,6 +92,18 @@ else if (_course is not null)
                 @if (_assignmentSuccess is not null)
                 {
                     <div class="alert alert-success">@_assignmentSuccess</div>
+                }
+                @if (_assignmentToEnd is not null)
+                {
+                    <div class="alert alert-warning d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <span>Завершить назначение преподавателя «@_assignmentToEnd.TeacherName» текущим моментом?</span>
+                        <span class="d-flex gap-2">
+                            <button class="btn btn-sm btn-danger" disabled="@_assignmentSaving"
+                                    @onclick="ConfirmEndAssignmentAsync">Завершить</button>
+                            <button class="btn btn-sm btn-outline-secondary" disabled="@_assignmentSaving"
+                                    @onclick="CancelEndAssignment">Отмена</button>
+                        </span>
+                    </div>
                 }
 
                 <div class="card mb-3">
@@ -192,7 +205,7 @@ else if (_course is not null)
                                             {
                                                 <button class="btn btn-sm btn-outline-danger"
                                                         disabled="@_assignmentSaving"
-                                                        @onclick="() => EndAssignmentAsync(assignment)">
+                                                        @onclick="() => RequestEndAssignment(assignment)">
                                                     Завершить
                                                 </button>
                                             }
@@ -214,7 +227,9 @@ else if (_course is not null)
 
     private bool _isLoading = true;
     private bool _isAdministrator;
-    private CourseInfo? _course;
+    private Guid _currentUserId;
+    private UserRole _currentRole;
+    private CourseDto? _course;
     private string? _error;
     private bool _assignmentsLoading;
     private bool _assignmentSaving;
@@ -224,16 +239,22 @@ else if (_course is not null)
     private string _startDate = DateTimeOffset.Now.ToString("yyyy-MM-dd");
     private string _endDate = string.Empty;
     private bool _isLead;
-    private List<TeacherOption> _availableTeachers = [];
-    private List<TeachingAssignmentInfo> _assignments = [];
+    private List<TeacherOptionDto> _availableTeachers = [];
+    private List<TeachingAssignmentDto> _assignments = [];
+    private TeachingAssignmentDto? _assignmentToEnd;
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override async Task OnInitializedAsync()
     {
-        if (!firstRender)
-            return;
-
         var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-        _isAdministrator = authenticationState.User.IsInRole("administrator");
+        if (!authenticationState.User.TryGetUserId(out _currentUserId) ||
+            !authenticationState.User.TryGetUserRole(out _currentRole))
+        {
+            _error = "Не удалось определить текущего пользователя.";
+            _isLoading = false;
+            return;
+        }
+
+        _isAdministrator = _currentRole == UserRole.Administrator;
         await LoadCourseAsync();
         if (_course is not null && _isAdministrator)
             await LoadAssignmentsAsync();
@@ -245,18 +266,19 @@ else if (_course is not null)
         _assignmentError = null;
         try
         {
-            var result = await JsRuntime.InvokeAsync<AssignmentResult>(
-                "platformApi.getTeachingAssignments",
+            var result = await TeachingAssignmentService.GetAsync(
+                _currentUserId,
+                _currentRole,
                 CourseId,
                 Year);
-            if (result.Success && result.Management is not null)
+            if (result.Status == TeachingAssignmentStatus.Success && result.Management is not null)
                 ApplyManagement(result.Management);
             else
-                _assignmentError = result.Message ?? "Не удалось загрузить назначения преподавателей.";
+                _assignmentError = AssignmentError(result.Status, "Не удалось загрузить назначения преподавателей.");
         }
         catch
         {
-            _assignmentError = "Не удалось связаться с сервером. Проверьте подключение и повторите запрос.";
+            _assignmentError = "Не удалось загрузить назначения преподавателей.";
         }
         finally
         {
@@ -270,7 +292,8 @@ else if (_course is not null)
         _assignmentError = null;
         _assignmentSuccess = null;
         if (!Guid.TryParse(_selectedTeacherId, out var teacherId) ||
-            string.IsNullOrWhiteSpace(_startDate))
+            !DateOnly.TryParse(_startDate, out var startDate) ||
+            (!string.IsNullOrWhiteSpace(_endDate) && !DateOnly.TryParse(_endDate, out _)))
         {
             _assignmentError = "Выберите преподавателя и дату начала.";
             return;
@@ -279,27 +302,33 @@ else if (_course is not null)
         _assignmentSaving = true;
         try
         {
-            var result = await JsRuntime.InvokeAsync<AssignmentResult>(
-                "platformApi.saveTeachingAssignment",
+            DateTimeOffset? endDate = null;
+            if (DateOnly.TryParse(_endDate, out var parsedEndDate))
+                endDate = new DateTimeOffset(parsedEndDate.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+
+            var result = await TeachingAssignmentService.SaveAsync(
+                _currentUserId,
+                _currentRole,
                 CourseId,
                 Year,
                 teacherId,
-                _startDate,
-                string.IsNullOrWhiteSpace(_endDate) ? null : _endDate,
-                _isLead);
-            if (result.Success && result.Management is not null)
+                new SaveTeachingAssignmentRequest(
+                    new DateTimeOffset(startDate.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero),
+                    endDate,
+                    _isLead));
+            if (result.Status == TeachingAssignmentStatus.Success && result.Management is not null)
             {
                 ApplyManagement(result.Management);
                 _assignmentSuccess = "Назначение преподавателя сохранено.";
             }
             else
             {
-                _assignmentError = result.Message ?? "Не удалось сохранить назначение преподавателя.";
+                _assignmentError = AssignmentError(result.Status, "Не удалось сохранить назначение преподавателя.");
             }
         }
         catch
         {
-            _assignmentError = "Не удалось связаться с сервером. Проверьте подключение и повторите запрос.";
+            _assignmentError = "Не удалось сохранить назначение преподавателя.";
         }
         finally
         {
@@ -307,37 +336,49 @@ else if (_course is not null)
         }
     }
 
-    private async Task EndAssignmentAsync(TeachingAssignmentInfo assignment)
+    private void RequestEndAssignment(TeachingAssignmentDto assignment)
     {
-        var confirmed = await JsRuntime.InvokeAsync<bool>(
-            "confirm",
-            $"Завершить назначение преподавателя «{assignment.TeacherName}» текущим моментом?");
-        if (!confirmed)
+        _assignmentToEnd = assignment;
+        _assignmentError = null;
+        _assignmentSuccess = null;
+    }
+
+    private void CancelEndAssignment()
+    {
+        _assignmentToEnd = null;
+    }
+
+    private async Task ConfirmEndAssignmentAsync()
+    {
+        if (_assignmentToEnd is null)
             return;
 
+        var assignment = _assignmentToEnd;
         _assignmentSaving = true;
         _assignmentError = null;
         _assignmentSuccess = null;
         try
         {
-            var result = await JsRuntime.InvokeAsync<AssignmentResult>(
-                "platformApi.endTeachingAssignment",
+            var result = await TeachingAssignmentService.EndAsync(
+                _currentUserId,
+                _currentRole,
                 CourseId,
                 Year,
                 assignment.TeacherId);
-            if (result.Success && result.Management is not null)
+            if (result.Status == TeachingAssignmentStatus.Success && result.Management is not null)
             {
                 ApplyManagement(result.Management);
+                _assignmentToEnd = null;
                 _assignmentSuccess = "Назначение преподавателя завершено.";
             }
             else
             {
-                _assignmentError = result.Message ?? "Не удалось завершить назначение преподавателя.";
+                _assignmentError = AssignmentError(result.Status, "Не удалось завершить назначение преподавателя.");
             }
         }
         catch
         {
-            _assignmentError = "Не удалось связаться с сервером. Проверьте подключение и повторите запрос.";
+            _assignmentError = "Не удалось завершить назначение преподавателя.";
         }
         finally
         {
@@ -345,7 +386,7 @@ else if (_course is not null)
         }
     }
 
-    private void EditAssignment(TeachingAssignmentInfo assignment)
+    private void EditAssignment(TeachingAssignmentDto assignment)
     {
         _selectedTeacherId = assignment.TeacherId.ToString();
         _startDate = assignment.StartDate.ToString("yyyy-MM-dd");
@@ -355,10 +396,10 @@ else if (_course is not null)
         _assignmentSuccess = "Данные назначения перенесены в форму. Измените их и нажмите «Сохранить».";
     }
 
-    private void ApplyManagement(TeachingAssignmentManagement management)
+    private void ApplyManagement(TeachingAssignmentManagementDto management)
     {
-        _availableTeachers = management.AvailableTeachers;
-        _assignments = management.Assignments;
+        _availableTeachers = management.AvailableTeachers.ToList();
+        _assignments = management.Assignments.ToList();
         if (string.IsNullOrWhiteSpace(_selectedTeacherId) && _availableTeachers.Count > 0)
             _selectedTeacherId = _availableTeachers[0].Id.ToString();
     }
@@ -369,18 +410,21 @@ else if (_course is not null)
     {
         try
         {
-            var result = await JsRuntime.InvokeAsync<CourseResult>(
-                "platformApi.getStaffCourse",
+            var result = await StaffCourseService.GetCourseAsync(
+                _currentUserId,
+                _currentRole,
                 CourseId,
                 Year);
-            if (result.Success)
+            if (result.Status == StaffCourseQueryStatus.Success)
                 _course = result.Course;
             else
-                _error = result.Message ?? "Не удалось открыть экземпляр курса.";
+                _error = result.Status == StaffCourseQueryStatus.CourseNotFound
+                    ? "Экземпляр курса не найден."
+                    : "У вас нет доступа к этому экземпляру курса.";
         }
         catch
         {
-            _error = "Не удалось связаться с сервером. Проверьте подключение и повторите запрос.";
+            _error = "Не удалось открыть экземпляр курса.";
         }
         finally
         {
@@ -389,49 +433,18 @@ else if (_course is not null)
         }
     }
 
-    private sealed class CourseInfo
+    private static string AssignmentError(TeachingAssignmentStatus status, string fallback)
     {
-        public Guid Id { get; set; }
-        public string Title { get; set; } = string.Empty;
-        public string Description { get; set; } = string.Empty;
-        public int Year { get; set; }
-    }
-
-    private sealed class CourseResult
-    {
-        public bool Success { get; set; }
-        public string? Message { get; set; }
-        public CourseInfo? Course { get; set; }
-    }
-
-    private sealed class TeacherOption
-    {
-        public Guid Id { get; set; }
-        public string DisplayName { get; set; } = string.Empty;
-    }
-
-    private sealed class TeachingAssignmentInfo
-    {
-        public Guid TeacherId { get; set; }
-        public string TeacherName { get; set; } = string.Empty;
-        public DateTimeOffset StartDate { get; set; }
-        public DateTimeOffset? EndDate { get; set; }
-        public bool IsLead { get; set; }
-        public bool IsActive { get; set; }
-    }
-
-    private sealed class TeachingAssignmentManagement
-    {
-        public Guid CourseId { get; set; }
-        public int Year { get; set; }
-        public List<TeacherOption> AvailableTeachers { get; set; } = [];
-        public List<TeachingAssignmentInfo> Assignments { get; set; } = [];
-    }
-
-    private sealed class AssignmentResult
-    {
-        public bool Success { get; set; }
-        public string? Message { get; set; }
-        public TeachingAssignmentManagement? Management { get; set; }
+        return status switch
+        {
+            TeachingAssignmentStatus.AccessDenied => "У вас нет доступа к управлению назначениями.",
+            TeachingAssignmentStatus.CourseNotFound => "Экземпляр курса не найден.",
+            TeachingAssignmentStatus.TeacherNotFound => "Активный преподаватель с таким ID не найден.",
+            TeachingAssignmentStatus.AssignmentNotFound => "Назначение преподавателя не найдено.",
+            TeachingAssignmentStatus.AssignmentNotActive => "Назначение уже не действует.",
+            TeachingAssignmentStatus.InvalidPeriod => "Дата окончания должна быть позже даты начала.",
+            TeachingAssignmentStatus.LeadAssignmentConflict => "На этот период уже назначен ведущий преподаватель.",
+            _ => fallback
+        };
     }
 }

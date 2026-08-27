@@ -1,6 +1,8 @@
 @page "/achievements"
 @attribute [Authorize(Roles = "student")]
 @inject IJSRuntime JsRuntime
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IStudentCourseService StudentCourseService
 
 <PageTitle>Достижения — Платформа достижений</PageTitle>
 
@@ -27,13 +29,13 @@ else if (!_isAuthenticated)
         Необходимо <a href="login">войти в систему</a>, чтобы просматривать достижения.
     </div>
 }
-else if (_courses == null || _courses.Length == 0)
+else if (_courses == null || _courses.Count == 0)
 {
     <div class="alert alert-info mt-3">Курсы не найдены. Обратитесь к администратору.</div>
 }
 else
 {
-    @if (_courses.Length > 1)
+    @if (_courses.Count > 1)
     {
         <div class="mb-3" style="max-width: 420px;">
             <label for="courseSelect" class="form-label">Курс</label>
@@ -97,7 +99,7 @@ else
 
     private bool _isLoading = true;
     private bool _isAuthenticated;
-    private CourseInfo[]? _courses;
+    private IReadOnlyList<CourseDto>? _courses;
     private Guid _selectedCourseId;
     private int _selectedYear;
     private bool _graphLoading;
@@ -119,26 +121,16 @@ else
 
         try
         {
-            var session = await JsRuntime.InvokeAsync<SessionResult>("platformApi.getCurrentUser");
-            _isAuthenticated = session.Success;
-
-            if (!session.Success)
+            var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            if (!authenticationState.User.TryGetUserId(out var studentId))
             {
-                if (session.Status != 401)
-                    _pageError = session.Message ?? "Не удалось проверить сессию.";
+                _isAuthenticated = false;
                 return;
             }
 
-            var coursesResult = await JsRuntime.InvokeAsync<CoursesResult>("platformApi.getCourses");
-            if (!coursesResult.Success)
-            {
-                _isAuthenticated = coursesResult.Status == 401 ? false : _isAuthenticated;
-                _pageError = coursesResult.Message ?? "Не удалось загрузить список курсов.";
-                return;
-            }
-
-            _courses = coursesResult.Courses;
-            if (_courses?.Length > 0)
+            _isAuthenticated = true;
+            _courses = await StudentCourseService.GetCoursesAsync(studentId);
+            if (_courses.Count > 0)
             {
                 _selectedCourseId = _courses[0].Id;
                 _selectedYear = _courses[0].Year;
@@ -205,26 +197,4 @@ else
         }
     }
 
-    private sealed class CourseInfo
-    {
-        public Guid Id { get; set; }
-        public string Title { get; set; } = "";
-        public string Description { get; set; } = "";
-        public int Year { get; set; }
-    }
-
-    private sealed class SessionResult
-    {
-        public bool Success { get; set; }
-        public int Status { get; set; }
-        public string? Message { get; set; }
-    }
-
-    private sealed class CoursesResult
-    {
-        public bool Success { get; set; }
-        public int Status { get; set; }
-        public string? Message { get; set; }
-        public CourseInfo[]? Courses { get; set; }
-    }
 }
