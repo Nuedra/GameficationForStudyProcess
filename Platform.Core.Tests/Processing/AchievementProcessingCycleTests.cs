@@ -540,6 +540,13 @@ public sealed class AchievementProcessingCycleTests
             DateTimeOffset effectiveAt,
             CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<LmsCourseInstance>>([]);
+
+        public Task<IReadOnlyList<LmsCourseStudent>> GetActiveCourseInstanceStudentsAsync(
+            Guid courseId,
+            int year,
+            DateTimeOffset effectiveAt,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<LmsCourseStudent>>([]);
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset currentTime) : TimeProvider

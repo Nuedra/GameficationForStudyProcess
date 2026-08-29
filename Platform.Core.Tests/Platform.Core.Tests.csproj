@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Platform.Core\Platform.Core.csproj" />
+    <ProjectReference Include="..\Platform.Lms\Platform.Lms.csproj" />
   </ItemGroup>
 
 </Project>
