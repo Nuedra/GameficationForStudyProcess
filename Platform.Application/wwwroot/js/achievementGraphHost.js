@@ -81,71 +81,10 @@
             app.mount(container);
             mountedApps.set(elementId, app);
 
-            await window.Vue.nextTick();
-            await window.Vue.nextTick();
-            fitGraphViewport(container, effectiveWidth, effectiveHeight);
-
             return "";
         } catch (error) {
             unmount(elementId);
             return "Не удалось загрузить граф достижений. Повторите запрос.";
-        }
-    }
-
-    function fitGraphViewport(container, canvasW, canvasH) {
-        try {
-            const graph =
-                container.__vue_app__
-                          ?._instance
-                          ?.subTree
-                          ?.component
-                          ?.data
-                          ?.graph;
-
-            if (!graph || !Array.isArray(graph._nodes) || graph._nodes.length === 0)
-                return;
-
-            let minX = Infinity, minY = Infinity,
-                maxX = -Infinity, maxY = -Infinity;
-
-            for (const node of graph._nodes) {
-                const x = node._x ?? 0;
-                const y = node._y ?? 0;
-
-                if (node._radius !== undefined) {
-                    minX = Math.min(minX, x - node._radius);
-                    maxX = Math.max(maxX, x + node._radius);
-                    minY = Math.min(minY, y - node._radius);
-                    maxY = Math.max(maxY, y + node._radius);
-                } else {
-                    const w = node._width  ?? 0;
-                    const h = node._height ?? 0;
-                    minX = Math.min(minX, x);
-                    maxX = Math.max(maxX, x + w);
-                    minY = Math.min(minY, y);
-                    maxY = Math.max(maxY, y + h);
-                }
-            }
-
-            if (minX === Infinity) return;
-
-            const pad      = 60;
-            const contentW = maxX - minX + pad * 2;
-            const contentH = maxY - minY + pad * 2;
-
-            // Scale to fit the whole graph inside the canvas
-            const fitScale = Math.min(canvasW / contentW, canvasH / contentH);
-
-            const centerX = (minX + maxX) / 2;
-            const centerY = (minY + maxY) / 2;
-
-            // Set viewport directly — TypeScript 'private' is compile-time only
-            graph._scale   = fitScale;
-            graph._offsetX = canvasW / 2 - centerX * fitScale;
-            graph._offsetY = canvasH / 2 - centerY * fitScale;
-
-        } catch (_) {
-            // Viewport fitting failed — the graph will open with default viewport
         }
     }
 

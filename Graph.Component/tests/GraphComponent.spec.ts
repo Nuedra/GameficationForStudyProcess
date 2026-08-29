@@ -57,6 +57,10 @@ describe('GraphComponent', () => {
         expect(earnedNode._info).toBe('Достижение получено');
         expect(lockedNode._color).toBe('#cfd8dc');
         expect(lockedNode._info).toBe('Достижение пока закрыто');
+        expect(lockedNode._label_info).toMatchObject({
+            text: '',
+            icon: 'lock'
+        });
 
         expect(availableEdge._color).toBe('#f9a825');
         expect(availableEdge._info).toBe('Достижение доступно');
@@ -66,6 +70,15 @@ describe('GraphComponent', () => {
         expect(lockedEdge._isEdgeDash).toBe(true);
         expect(lockedEdge._source?._id).toBe('locked-node');
         expect(lockedEdge._target?._id).toBe('earned-node');
+    });
+
+    it('centers graph nodes in the viewport after loading XML', async () => {
+        const wrapper = await mountGraph();
+        const vm = wrapper.vm as any;
+
+        expect(vm.graph._scale).toBe(1);
+        expect(vm.graph._offsetX).toBeCloseTo(47);
+        expect(vm.graph._offsetY).toBeCloseTo(50);
     });
 
     it('draws edges before nodes on canvas', async () => {
@@ -126,9 +139,9 @@ describe('GraphComponent', () => {
 
         expect(context.calls).toContainEqual({
             name: 'setTransform',
-            args: [1.1, 0, 0, 1.1, -10.000000000000014, -8]
+            args: [1.1, 0, 0, 1.1, 41.699999999999996, 47]
         });
-        expect(vm.getObjectAt(88, 88)?._id).toBe('earned-node');
+        expect(vm.getObjectAt(130, 135)?._id).toBe('earned-node');
 
         canvas.dispatchEvent(new MouseEvent('mousedown', {
             clientX: 10,
@@ -145,7 +158,7 @@ describe('GraphComponent', () => {
 
         expect(context.calls).toContainEqual({
             name: 'setTransform',
-            args: [1.1, 0, 0, 1.1, 9.999999999999986, 27]
+            args: [1.1, 0, 0, 1.1, 61.699999999999996, 82]
         });
     });
 

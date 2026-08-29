@@ -131,6 +131,7 @@ export interface ILine extends IShape {
 export interface ILabel {
     //id: string
     text: string
+    icon?: 'lock'
     startX?: number
     startY?: number
     endX?: number
@@ -468,6 +469,150 @@ export class Graph {
         this._offsetX = 0;
         this._offsetY = 0;
         this.requestRedraw();
+    }
+
+    fitViewportToNodes(viewportWidth?: number, viewportHeight?: number, padding: number = 60): void {
+        if (!this._canvas || this._nodes.length === 0) return;
+
+        const bounds = this.getNodesBounds();
+        if (!bounds) return;
+
+        const width = viewportWidth || this._canvas.width;
+        const height = viewportHeight || this._canvas.height;
+        const contentWidth = Math.max(bounds.maxX - bounds.minX + padding * 2, 1);
+        const contentHeight = Math.max(bounds.maxY - bounds.minY + padding * 2, 1);
+        const fitScale = Math.min(1, width / contentWidth, height / contentHeight);
+        const centerX = (bounds.minX + bounds.maxX) / 2;
+        const centerY = (bounds.minY + bounds.maxY) / 2;
+
+        this._scale = Math.min(4, Math.max(0.2, fitScale));
+        this._offsetX = width / 2 - centerX * this._scale;
+        this._offsetY = height / 2 - centerY * this._scale;
+        this.requestRedraw();
+    }
+
+    private getNodesBounds(): { minX: number; minY: number; maxX: number; maxY: number } | null {
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+
+        for (const node of this._nodes) {
+            const bounds = this.getNodeBounds(node);
+            if (!bounds) continue;
+
+            minX = Math.min(minX, bounds.minX);
+            minY = Math.min(minY, bounds.minY);
+            maxX = Math.max(maxX, bounds.maxX);
+            maxY = Math.max(maxY, bounds.maxY);
+        }
+
+        return minX === Infinity
+            ? null
+            : { minX, minY, maxX, maxY };
+    }
+
+    private getNodeBounds(node: Node): { minX: number; minY: number; maxX: number; maxY: number } | null {
+        const item = node as any;
+
+        if (typeof item._radius === 'number' &&
+            typeof item._x === 'number' &&
+            typeof item._y === 'number') {
+            return {
+                minX: item._x - item._radius,
+                minY: item._y - item._radius,
+                maxX: item._x + item._radius,
+                maxY: item._y + item._radius
+            };
+        }
+
+        if (typeof item._radius_x === 'number' &&
+            typeof item._radius_y === 'number' &&
+            typeof item._x === 'number' &&
+            typeof item._y === 'number') {
+            return {
+                minX: item._x - item._radius_x,
+                minY: item._y - item._radius_y,
+                maxX: item._x + item._radius_x,
+                maxY: item._y + item._radius_y
+            };
+        }
+
+        if (typeof item._width === 'number' &&
+            typeof item._height === 'number' &&
+            typeof item._x === 'number' &&
+            typeof item._y === 'number') {
+            if (item._type === 'rhomb') {
+                return {
+                    minX: item._x - item._width / 2,
+                    minY: item._y - item._height / 2,
+                    maxX: item._x + item._width / 2,
+                    maxY: item._y + item._height / 2
+                };
+            }
+
+            return {
+                minX: item._x,
+                minY: item._y,
+                maxX: item._x + item._width,
+                maxY: item._y + item._height
+            };
+        }
+
+        if (typeof item._x_1 === 'number' &&
+            typeof item._y_1 === 'number' &&
+            typeof item._x_2 === 'number' &&
+            typeof item._y_2 === 'number' &&
+            typeof item._x_3 === 'number' &&
+            typeof item._y_3 === 'number') {
+            return {
+                minX: Math.min(item._x_1, item._x_2, item._x_3),
+                minY: Math.min(item._y_1, item._y_2, item._y_3),
+                maxX: Math.max(item._x_1, item._x_2, item._x_3),
+                maxY: Math.max(item._y_1, item._y_2, item._y_3)
+            };
+        }
+
+        if (Array.isArray(item.points) && item.points.length > 0) {
+            const offsetX = typeof item._x_center === 'number' ? item._x_center : 0;
+            const offsetY = typeof item._y_center === 'number' ? item._y_center : 0;
+            const points = item.points.map((point: { x: number; y: number }) => ({
+                x: point.x + offsetX,
+                y: point.y + offsetY
+            }));
+
+            return {
+                minX: Math.min(...points.map((point: { x: number; y: number }) => point.x)),
+                minY: Math.min(...points.map((point: { x: number; y: number }) => point.y)),
+                maxX: Math.max(...points.map((point: { x: number; y: number }) => point.x)),
+                maxY: Math.max(...points.map((point: { x: number; y: number }) => point.y))
+            };
+        }
+
+        if (typeof item._rad === 'number' &&
+            typeof item._x_C === 'number' &&
+            typeof item._y_C === 'number') {
+            return {
+                minX: item._x_C - item._rad,
+                minY: item._y_C - item._rad,
+                maxX: item._x_C + item._rad,
+                maxY: item._y_C + item._rad
+            };
+        }
+
+        if (typeof item._width === 'number' &&
+            typeof item._height === 'number' &&
+            typeof item._x_C === 'number' &&
+            typeof item._y_C === 'number') {
+            return {
+                minX: item._x_C - item._width / 2,
+                minY: item._y_C - item._height / 2,
+                maxX: item._x_C + item._width / 2,
+                maxY: item._y_C + item._height / 2
+            };
+        }
+
+        return null;
     }
 
     screenToGraph(x: number, y: number): { x: number; y: number } {
@@ -4925,6 +5070,7 @@ export class CrowFootArrowHead extends ArrowHead {
 //implements ILabel
 export class Label {
     _text: string
+    _icon?: 'lock'
     _startX: number
     _startY: number
     _endX: number
@@ -4941,6 +5087,7 @@ export class Label {
 
     constructor(label: ILabel) {
         this._text = label.text
+        this._icon = label.icon
         if (typeof label.startX !== 'undefined') {
             this._startX = label.startX
         } else throw Error('Invalid data');
@@ -5014,6 +5161,12 @@ export class Label {
 
         ctx.textBaseline = 'middle';
 
+        if (this._icon === 'lock') {
+            this.drawLockIcon(ctx);
+            ctx.restore();
+            return;
+        }
+
         //const working_text = this.stringToUnicode(this._text);
 
         //strokeText - будет оконтовка
@@ -5054,6 +5207,35 @@ export class Label {
         });
 
         //ctx.fillText(this._text, 0, 0);
+        ctx.restore();
+    }
+
+    private drawLockIcon(ctx: CanvasRenderingContext2D): void {
+        const width = 24;
+        const bodyHeight = 16;
+        const bodyTop = -1;
+        const shackleRadius = 7;
+
+        ctx.save();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#455a64';
+        ctx.fillStyle = '#455a64';
+
+        ctx.beginPath();
+        ctx.arc(0, bodyTop, shackleRadius, Math.PI, 0, false);
+        ctx.lineTo(shackleRadius, bodyTop + 4);
+        ctx.moveTo(-shackleRadius, bodyTop);
+        ctx.lineTo(-shackleRadius, bodyTop + 4);
+        ctx.stroke();
+
+        ctx.fillRect(-width / 2, bodyTop + 3, width, bodyHeight);
+        ctx.strokeRect(-width / 2, bodyTop + 3, width, bodyHeight);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(0, bodyTop + 10, 2.5, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.fillRect(-1.25, bodyTop + 10, 2.5, 5);
         ctx.restore();
     }
 
