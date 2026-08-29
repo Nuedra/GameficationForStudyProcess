@@ -19,6 +19,7 @@ public sealed class ApiExceptionMiddleware(
         catch (Exception exception) when (IsApiRequest(context) && !context.Response.HasStarted)
         {
             logger.LogError(
+                exception,
                 "Unhandled API error. Exception type: {ExceptionType}; method: {Method}; path: {Path}; trace id: {TraceId}",
                 exception.GetType().FullName,
                 context.Request.Method,
