@@ -128,6 +128,11 @@ else
                                                 }
                                             </td>
                                             <td class="text-end text-nowrap">
+                                                <button class="btn btn-sm btn-outline-secondary me-2"
+                                                        disabled="@_isSaving"
+                                                        @onclick="() => ToggleAwardsAsync(achievement)">
+                                                    Выдачи
+                                                </button>
                                                 <button class="btn btn-sm btn-outline-primary me-2"
                                                         @onclick="() => SelectAchievement(achievement)">
                                                     Изменить
@@ -156,6 +161,24 @@ else
                                 </div>
                                 <button type="button" class="btn-close" aria-label="Закрыть"
                                         @onclick="CloseAwards"></button>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label small" for="manual-award-student-id">
+                                    ID студента для ручной выдачи
+                                </label>
+                                <div class="input-group input-group-sm">
+                                    <input id="manual-award-student-id"
+                                           class="form-control"
+                                           placeholder="GUID студента"
+                                           @bind="_awardStudentId" />
+                                    <button type="button"
+                                            class="btn btn-outline-primary"
+                                            disabled="@(_isSaving || _awardsLoading)"
+                                            @onclick="GrantAwardAsync">
+                                        Выдать
+                                    </button>
+                                </div>
                             </div>
 
                             @if (_awardsLoading)
@@ -332,7 +355,7 @@ else
                                 <tr>
                                     <td class="text-nowrap">@FormatAuditDate(auditEvent.OccurredAt)</td>
                                     <td>
-                                        <span class="badge @(auditEvent.EventType == AchievementAwardAuditEventType.Granted ? "bg-success" : "bg-danger")">
+                                        <span class="badge @AuditEventBadgeClass(auditEvent.EventType)">
                                             @AuditEventLabel(auditEvent.EventType)
                                         </span>
                                     </td>
@@ -383,6 +406,7 @@ else
     private bool _criteriaEnabled = true;
     private Guid? _awardAchievementId;
     private string _awardAchievementTitle = string.Empty;
+    private string _awardStudentId = string.Empty;
     private bool _awardsLoading;
     private List<ManagedAchievementAwardDto> _awards = [];
     private ManagedAchievementDto? _achievementToDelete;
@@ -648,6 +672,7 @@ else
 
         _awardAchievementId = achievement.Id;
         _awardAchievementTitle = achievement.Title;
+        _awardStudentId = string.Empty;
         _awards = [];
         _awardsLoading = true;
         _error = null;
@@ -673,6 +698,57 @@ else
         finally
         {
             _awardsLoading = false;
+        }
+    }
+
+    private async Task GrantAwardAsync()
+    {
+        if (!_awardAchievementId.HasValue)
+            return;
+
+        ClearNotifications();
+        if (!Guid.TryParse(_awardStudentId, out var studentId) || studentId == Guid.Empty)
+        {
+            _error = "ID студента должен иметь формат GUID.";
+            return;
+        }
+
+        _awardToRevoke = null;
+        _achievementToDelete = null;
+        _isSaving = true;
+        try
+        {
+            var result = await AchievementManagementService.GrantAwardAsync(
+                _currentUserId,
+                _currentRole,
+                CourseId,
+                Year,
+                _awardAchievementId.Value,
+                studentId);
+            if (result.Status == AchievementManagementStatus.Success && result.Achievement is not null)
+            {
+                _awards.RemoveAll(item => item.StudentId == studentId);
+                _awards.Add(new ManagedAchievementAwardDto(studentId));
+                _awards = _awards.OrderBy(item => item.StudentId).ToList();
+                _awardStudentId = string.Empty;
+                Upsert(result.Achievement);
+                if (_selectedAchievementId == result.Achievement.Id)
+                    _selectedAchievement = result.Achievement;
+                await LoadAuditAsync(false);
+                _message = $"Ачивка выдана студенту {studentId}.";
+            }
+            else
+            {
+                _error = AchievementError(result.Status, "Не удалось выдать ачивку студенту.");
+            }
+        }
+        catch
+        {
+            _error = "Не удалось выдать ачивку студенту.";
+        }
+        finally
+        {
+            _isSaving = false;
         }
     }
 
@@ -734,6 +810,7 @@ else
     {
         _awardAchievementId = null;
         _awardAchievementTitle = string.Empty;
+        _awardStudentId = string.Empty;
         _awards = [];
         _awardsLoading = false;
         _awardToRevoke = null;
@@ -846,14 +923,36 @@ else
         _ => "Обычная"
     };
 
+    private static string AuditEventBadgeClass(AchievementAwardAuditEventType eventType) =>
+        eventType switch
+        {
+            AchievementAwardAuditEventType.Granted => "bg-success",
+            AchievementAwardAuditEventType.Revoked => "bg-danger",
+            AchievementAwardAuditEventType.Rejected => "bg-warning text-dark",
+            _ => "bg-secondary"
+        };
+
     private static string AuditEventLabel(AchievementAwardAuditEventType eventType) =>
-        eventType == AchievementAwardAuditEventType.Granted ? "Выдано" : "Отозвано";
+        eventType switch
+        {
+            AchievementAwardAuditEventType.Granted => "Выдано",
+            AchievementAwardAuditEventType.Revoked => "Отозвано",
+            AchievementAwardAuditEventType.Rejected => "Отказано",
+            _ => "Неизвестно"
+        };
 
     private static string AuditReasonLabel(AchievementAwardAuditReason reason) => reason switch
     {
         AchievementAwardAuditReason.CriteriaMatched => "Критерий выполнен",
+        AchievementAwardAuditReason.ManualGrant => "Ручная выдача",
+        AchievementAwardAuditReason.ManualRevocation => "Ручной отзыв",
         AchievementAwardAuditReason.AchievementDeletion => "Удаление достижения",
-        _ => "Ручной отзыв"
+        AchievementAwardAuditReason.PrerequisiteRevocation => "Отзыв предыдущей ачивки",
+        AchievementAwardAuditReason.ManualGrantStudentNotFound => "Студент не найден",
+        AchievementAwardAuditReason.ManualGrantEnrollmentMissing => "Студент не обучается на курсе",
+        AchievementAwardAuditReason.ManualGrantAlreadyExists => "Ачивка уже выдана",
+        AchievementAwardAuditReason.ManualGrantPrerequisiteMissing => "Нет полученной предыдущей ачивки",
+        _ => "Неизвестное основание"
     };
 
     private static string AuditActorLabel(AchievementAwardAuditEventDto auditEvent)
@@ -883,6 +982,10 @@ else
             AchievementManagementStatus.AchievementNotFound => "Достижение не найдено.",
             AchievementManagementStatus.CriteriaNotFound => "Критерий достижения не найден.",
             AchievementManagementStatus.AwardNotFound => "У указанного студента уже нет этой ачивки.",
+            AchievementManagementStatus.StudentNotFound => "Студент не найден.",
+            AchievementManagementStatus.StudentCourseEnrollmentRequired => "Студент не обучается на этом курсе в выбранном году.",
+            AchievementManagementStatus.AwardAlreadyExists => "У указанного студента уже есть эта ачивка.",
+            AchievementManagementStatus.AchievementPrerequisiteMissing => "Сначала студент должен получить одну из предыдущих ачивок в графе.",
             AchievementManagementStatus.InvalidAchievement => "Проверьте название, описание и трек достижения.",
             AchievementManagementStatus.InvalidCriteria => "Критерий должен содержать хотя бы один тег.",
             AchievementManagementStatus.DuplicateTitle => "В этом курсе уже есть достижение с таким названием.",

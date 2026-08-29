@@ -25,12 +25,15 @@ public sealed record ManagedAchievementCriteriaDto(
 public sealed record ManagedAchievementAwardDto(
     Guid StudentId);
 
+public sealed record ManualAchievementAwardRequest(
+    Guid StudentId);
+
 public sealed record AchievementAwardAuditEventDto(
     Guid Id,
-    Guid AwardId,
+    Guid? AwardId,
     AchievementAwardAuditEventType EventType,
     DateTime OccurredAt,
-    DateTime AwardedAt,
+    DateTime? AwardedAt,
     Guid StudentId,
     Guid AchievementId,
     string AchievementTitle,

@@ -3,7 +3,9 @@ using Platform.Application.Contracts;
 using Platform.Core.Abstractions;
 using Platform.Core.Appraisals;
 using Platform.Core.Models;
+using Platform.Core.Processing;
 using Platform.DataAccess.Postgress;
+using Platform.Lms;
 
 namespace Platform.Application.Services;
 
@@ -11,6 +13,8 @@ public sealed class AchievementManagementService(
     AchievementDbContext dbContext,
     IStaffCourseService staffCourseService,
     IAccessPolicyService accessPolicy,
+    ILmsDataSource lmsDataSource,
+    AchievementProcessingCycle achievementProcessingCycle,
     TimeProvider timeProvider,
     ILogger<AchievementManagementService> logger) : IAchievementManagementService
 {
@@ -243,6 +247,164 @@ public sealed class AchievementManagementService(
             Awards: awards);
     }
 
+    public async Task<AchievementManagementResult> GrantAwardAsync(
+        Guid userId,
+        UserRole role,
+        Guid courseId,
+        int year,
+        Guid achievementId,
+        Guid studentId,
+        CancellationToken cancellationToken = default)
+    {
+        var accessStatus = await GetAccessStatusAsync(
+            userId,
+            role,
+            courseId,
+            year,
+            cancellationToken);
+        if (accessStatus != AchievementManagementStatus.Success)
+            return new AchievementManagementResult(accessStatus);
+
+        var achievement = await FindAchievementAsync(
+            courseId,
+            year,
+            achievementId,
+            cancellationToken);
+        if (achievement is null)
+            return new AchievementManagementResult(AchievementManagementStatus.AchievementNotFound);
+
+        var effectiveAt = timeProvider.GetUtcNow();
+        var studentExists = await lmsDataSource.GetPersonAsync(
+            studentId,
+            cancellationToken) is not null;
+        if (!studentExists)
+        {
+            await AddRejectedGrantAuditEventAsync(
+                achievement,
+                studentId,
+                userId,
+                role,
+                AchievementAwardAuditReason.ManualGrantStudentNotFound,
+                effectiveAt.UtcDateTime,
+                cancellationToken);
+            return new AchievementManagementResult(AchievementManagementStatus.StudentNotFound);
+        }
+
+        var hasActiveEnrollment = await lmsDataSource.HasActiveEnrollmentAsync(
+            studentId,
+            courseId,
+            year,
+            effectiveAt,
+            cancellationToken);
+        if (!hasActiveEnrollment)
+        {
+            await AddRejectedGrantAuditEventAsync(
+                achievement,
+                studentId,
+                userId,
+                role,
+                AchievementAwardAuditReason.ManualGrantEnrollmentMissing,
+                effectiveAt.UtcDateTime,
+                cancellationToken);
+            return new AchievementManagementResult(
+                AchievementManagementStatus.StudentCourseEnrollmentRequired);
+        }
+
+        var alreadyAwarded = await dbContext.StudentAchievements
+            .AsNoTracking()
+            .AnyAsync(
+                item =>
+                    item.StudentID == studentId &&
+                    item.AchievementID == achievementId,
+                cancellationToken);
+        if (alreadyAwarded)
+        {
+            await AddRejectedGrantAuditEventAsync(
+                achievement,
+                studentId,
+                userId,
+                role,
+                AchievementAwardAuditReason.ManualGrantAlreadyExists,
+                effectiveAt.UtcDateTime,
+                cancellationToken);
+            return new AchievementManagementResult(AchievementManagementStatus.AwardAlreadyExists);
+        }
+
+        if (!await HasEarnedPrerequisiteAsync(
+                studentId,
+                courseId,
+                year,
+                achievementId,
+                cancellationToken))
+        {
+            await AddRejectedGrantAuditEventAsync(
+                achievement,
+                studentId,
+                userId,
+                role,
+                AchievementAwardAuditReason.ManualGrantPrerequisiteMissing,
+                effectiveAt.UtcDateTime,
+                cancellationToken);
+            return new AchievementManagementResult(
+                AchievementManagementStatus.AchievementPrerequisiteMissing);
+        }
+
+        var now = effectiveAt.UtcDateTime;
+        var award = new StudentAchievementEntity
+        {
+            Id = Guid.NewGuid(),
+            StudentID = studentId,
+            AchievementID = achievement.Id,
+            Achievement = achievement,
+            LabID = achievement.LabID,
+            AchievementGotDate = now,
+            AchievementFoundDate = now,
+            IsNotificationSeen = false,
+            IsFirstAnimationShown = false
+        };
+
+        dbContext.StudentAchievements.Add(award);
+        var grantAuditEvent = CreateGrantAuditEvent(
+            achievement,
+            award,
+            userId,
+            role,
+            now);
+        dbContext.AchievementAwardAuditEvents.Add(grantAuditEvent);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (IsUniqueAwardViolation(exception))
+        {
+            DetachPendingGrant(award, grantAuditEvent);
+            await AddRejectedGrantAuditEventAsync(
+                achievement,
+                studentId,
+                userId,
+                role,
+                AchievementAwardAuditReason.ManualGrantAlreadyExists,
+                now,
+                cancellationToken);
+            return new AchievementManagementResult(AchievementManagementStatus.AwardAlreadyExists);
+        }
+
+        await achievementProcessingCycle.RunAsync(studentId, cancellationToken);
+
+        logger.LogInformation(
+            "Achievement award granted manually. UserId={UserId}, Role={Role}, CourseId={CourseId}, Year={Year}, AchievementId={AchievementId}, StudentId={StudentId}",
+            userId,
+            role,
+            courseId,
+            year,
+            achievementId,
+            studentId);
+
+        return new AchievementManagementResult(
+            AchievementManagementStatus.Success,
+            Achievement: await BuildDtoAsync(achievement, cancellationToken));
+    }
+
     public async Task<AchievementManagementResult> RevokeAwardAsync(
         Guid userId,
         UserRole role,
@@ -277,28 +439,139 @@ public sealed class AchievementManagementService(
         if (award is null)
             return new AchievementManagementResult(AchievementManagementStatus.AwardNotFound);
 
-        dbContext.AchievementAwardAuditEvents.Add(CreateRevocationAuditEvent(
-            achievement,
-            award,
-            userId,
-            role,
-            AchievementAwardAuditReason.ManualRevocation,
-            timeProvider.GetUtcNow().UtcDateTime));
+        var occurredAt = timeProvider.GetUtcNow().UtcDateTime;
+        var cascadeAwards = await GetUnsupportedDependentAwardsAfterRevocationAsync(
+            studentId,
+            courseId,
+            year,
+            achievementId,
+            cancellationToken);
+        var auditEvents = new List<AchievementAwardAuditEventEntity>
+        {
+            CreateRevocationAuditEvent(
+                achievement,
+                award,
+                userId,
+                role,
+                AchievementAwardAuditReason.ManualRevocation,
+                occurredAt)
+        };
+        auditEvents.AddRange(cascadeAwards.Select(cascadeAward =>
+            CreateRevocationAuditEvent(
+                cascadeAward.Achievement,
+                cascadeAward,
+                userId,
+                role,
+                AchievementAwardAuditReason.PrerequisiteRevocation,
+                occurredAt)));
+
+        dbContext.AchievementAwardAuditEvents.AddRange(auditEvents);
         dbContext.StudentAchievements.Remove(award);
+        if (cascadeAwards.Count > 0)
+            dbContext.StudentAchievements.RemoveRange(cascadeAwards);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation(
-            "Achievement award revoked. UserId={UserId}, Role={Role}, CourseId={CourseId}, Year={Year}, AchievementId={AchievementId}, StudentId={StudentId}",
+            "Achievement award revoked. UserId={UserId}, Role={Role}, CourseId={CourseId}, Year={Year}, AchievementId={AchievementId}, StudentId={StudentId}, CascadedAwardCount={CascadedAwardCount}",
             userId,
             role,
             courseId,
             year,
             achievementId,
-            studentId);
+            studentId,
+            cascadeAwards.Count);
 
         return new AchievementManagementResult(
             AchievementManagementStatus.Success,
             Achievement: await BuildDtoAsync(achievement, cancellationToken));
+    }
+
+    private async Task<IReadOnlyList<StudentAchievementEntity>> GetUnsupportedDependentAwardsAfterRevocationAsync(
+        Guid studentId,
+        Guid courseId,
+        int year,
+        Guid revokedAchievementId,
+        CancellationToken cancellationToken)
+    {
+        var courseAchievementIds = await dbContext.Achievements
+            .AsNoTracking()
+            .Where(achievement =>
+                achievement.CourseID == courseId &&
+                achievement.Year == year)
+            .Select(achievement => achievement.Id)
+            .ToListAsync(cancellationToken);
+        var courseAchievementIdSet = courseAchievementIds.ToHashSet();
+
+        var earnedAwards = await dbContext.StudentAchievements
+            .Include(award => award.Achievement)
+            .Where(award =>
+                award.StudentID == studentId &&
+                courseAchievementIdSet.Contains(award.AchievementID))
+            .ToListAsync(cancellationToken);
+        var awardsByAchievementId = earnedAwards
+            .Where(award => award.AchievementID != revokedAchievementId)
+            .ToDictionary(award => award.AchievementID);
+        var remainingEarnedIds = awardsByAchievementId.Keys.ToHashSet();
+
+        var dependenciesByTarget = (await dbContext.AchievementConnections
+                .AsNoTracking()
+                .Where(connection =>
+                    courseAchievementIdSet.Contains(connection.SourceId) &&
+                    courseAchievementIdSet.Contains(connection.TargetId))
+                .Select(connection => new
+                {
+                    connection.SourceId,
+                    connection.TargetId
+                })
+                .ToListAsync(cancellationToken))
+            .GroupBy(connection => connection.TargetId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(connection => connection.SourceId).ToHashSet());
+        var revokedIds = new HashSet<Guid>();
+
+        var changed = true;
+        while (changed)
+        {
+            changed = false;
+            foreach (var award in awardsByAchievementId.Values)
+            {
+                if (revokedIds.Contains(award.AchievementID) ||
+                    !dependenciesByTarget.TryGetValue(award.AchievementID, out var prerequisites) ||
+                    prerequisites.Count == 0 ||
+                    prerequisites.Any(remainingEarnedIds.Contains))
+                {
+                    continue;
+                }
+
+                revokedIds.Add(award.AchievementID);
+                remainingEarnedIds.Remove(award.AchievementID);
+                changed = true;
+            }
+        }
+
+        return awardsByAchievementId.Values
+            .Where(award => revokedIds.Contains(award.AchievementID))
+            .ToList();
+    }
+
+    private async Task AddRejectedGrantAuditEventAsync(
+        AchievementEntity achievement,
+        Guid studentId,
+        Guid actorId,
+        UserRole actorRole,
+        AchievementAwardAuditReason reason,
+        DateTime occurredAt,
+        CancellationToken cancellationToken)
+    {
+        dbContext.AchievementAwardAuditEvents.Add(CreateRejectedGrantAuditEvent(
+            achievement,
+            studentId,
+            actorId,
+            actorRole,
+            reason,
+            occurredAt));
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<AchievementManagementResult> GetAwardAuditAsync(
@@ -484,6 +757,32 @@ public sealed class AchievementManagementService(
         };
     }
 
+    private async Task<bool> HasEarnedPrerequisiteAsync(
+        Guid studentId,
+        Guid courseId,
+        int year,
+        Guid achievementId,
+        CancellationToken cancellationToken)
+    {
+        var prerequisiteIds = await dbContext.AchievementConnections
+            .AsNoTracking()
+            .Where(connection =>
+                connection.TargetId == achievementId &&
+                connection.Source.CourseID == courseId &&
+                connection.Source.Year == year)
+            .Select(connection => connection.SourceId)
+            .ToListAsync(cancellationToken);
+
+        return prerequisiteIds.Count == 0 ||
+            await dbContext.StudentAchievements
+                .AsNoTracking()
+                .AnyAsync(
+                    item =>
+                        item.StudentID == studentId &&
+                        prerequisiteIds.Contains(item.AchievementID),
+                    cancellationToken);
+    }
+
     private Task<AchievementEntity?> FindAchievementAsync(
         Guid courseId,
         int year,
@@ -595,6 +894,61 @@ public sealed class AchievementManagementService(
                     entity.Criteria.IsEnabled));
     }
 
+    private static AchievementAwardAuditEventEntity CreateGrantAuditEvent(
+        AchievementEntity achievement,
+        StudentAchievementEntity award,
+        Guid actorId,
+        UserRole actorRole,
+        DateTime occurredAt)
+    {
+        return new AchievementAwardAuditEventEntity
+        {
+            Id = Guid.NewGuid(),
+            AwardID = award.Id,
+            EventType = AchievementAwardAuditEventType.Granted,
+            OccurredAt = occurredAt,
+            AwardedAt = award.AchievementGotDate,
+            StudentID = award.StudentID,
+            AchievementID = achievement.Id,
+            AchievementTitle = achievement.Title,
+            CourseID = achievement.CourseID,
+            Year = achievement.Year,
+            ActorID = actorId,
+            ActorRole = ToAuditActorRole(actorRole, "grant"),
+            Reason = AchievementAwardAuditReason.ManualGrant,
+            CriterionExpression = achievement.Criteria?.Expression,
+            CriterionScope = achievement.Criteria?.Scope
+        };
+    }
+
+    private static AchievementAwardAuditEventEntity CreateRejectedGrantAuditEvent(
+        AchievementEntity achievement,
+        Guid studentId,
+        Guid actorId,
+        UserRole actorRole,
+        AchievementAwardAuditReason reason,
+        DateTime occurredAt)
+    {
+        return new AchievementAwardAuditEventEntity
+        {
+            Id = Guid.NewGuid(),
+            AwardID = null,
+            EventType = AchievementAwardAuditEventType.Rejected,
+            OccurredAt = occurredAt,
+            AwardedAt = null,
+            StudentID = studentId,
+            AchievementID = achievement.Id,
+            AchievementTitle = achievement.Title,
+            CourseID = achievement.CourseID,
+            Year = achievement.Year,
+            ActorID = actorId,
+            ActorRole = ToAuditActorRole(actorRole, "grant"),
+            Reason = reason,
+            CriterionExpression = achievement.Criteria?.Expression,
+            CriterionScope = achievement.Criteria?.Scope
+        };
+    }
+
     private static AchievementAwardAuditEventEntity CreateRevocationAuditEvent(
         AchievementEntity achievement,
         StudentAchievementEntity award,
@@ -616,16 +970,54 @@ public sealed class AchievementManagementService(
             CourseID = achievement.CourseID,
             Year = achievement.Year,
             ActorID = actorId,
-            ActorRole = actorRole switch
-            {
-                UserRole.Teacher => AchievementAwardAuditActorRole.Teacher,
-                UserRole.Administrator => AchievementAwardAuditActorRole.Administrator,
-                _ => throw new InvalidOperationException("Only staff can revoke achievement awards.")
-            },
+            ActorRole = ToAuditActorRole(actorRole, "revoke"),
             Reason = reason,
             CriterionExpression = achievement.Criteria?.Expression,
             CriterionScope = achievement.Criteria?.Scope
         };
+    }
+
+    private static AchievementAwardAuditActorRole ToAuditActorRole(
+        UserRole role,
+        string action)
+    {
+        return role switch
+        {
+            UserRole.Teacher => AchievementAwardAuditActorRole.Teacher,
+            UserRole.Administrator => AchievementAwardAuditActorRole.Administrator,
+            _ => throw new InvalidOperationException(
+                $"Only staff can {action} achievement awards.")
+        };
+    }
+
+    private void DetachPendingGrant(
+        StudentAchievementEntity award,
+        AchievementAwardAuditEventEntity auditEvent)
+    {
+        dbContext.Entry(award).State = EntityState.Detached;
+        dbContext.Entry(auditEvent).State = EntityState.Detached;
+    }
+
+    private static bool IsUniqueAwardViolation(DbUpdateException exception)
+    {
+        const string uniqueViolationSqlState = "23505";
+        const string awardIndexName = "IX_student_achievements_StudentID_AchievementID";
+
+        for (var current = exception.InnerException;
+             current is not null;
+             current = current.InnerException)
+        {
+            var exceptionType = current.GetType();
+            if (exceptionType.FullName != "Npgsql.PostgresException")
+                continue;
+
+            var sqlState = exceptionType.GetProperty("SqlState")?.GetValue(current) as string;
+            var constraintName = exceptionType.GetProperty("ConstraintName")?.GetValue(current) as string;
+            return sqlState == uniqueViolationSqlState &&
+                string.Equals(constraintName, awardIndexName, StringComparison.Ordinal);
+        }
+
+        return false;
     }
 
     private static SaveAchievementRequest Normalize(SaveAchievementRequest request)

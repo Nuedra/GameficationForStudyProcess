@@ -154,11 +154,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS "IX_student_achievements_StudentID_Achievement
 
 CREATE TABLE IF NOT EXISTS "achievement_award_audit_events" (
     "Id" uuid PRIMARY KEY,
-    "AwardID" uuid NOT NULL,
+    "AwardID" uuid NULL,
     "EventType" text NOT NULL
-        CHECK ("EventType" IN ('Granted', 'Revoked')),
+        CHECK ("EventType" IN ('Granted', 'Revoked', 'Rejected')),
     "OccurredAt" timestamptz NOT NULL,
-    "AwardedAt" timestamptz NOT NULL,
+    "AwardedAt" timestamptz NULL,
     "StudentID" uuid NOT NULL,
     "AchievementID" uuid NOT NULL,
     "AchievementTitle" text NOT NULL,
@@ -168,11 +168,71 @@ CREATE TABLE IF NOT EXISTS "achievement_award_audit_events" (
     "ActorRole" text NOT NULL
         CHECK ("ActorRole" IN ('System', 'Teacher', 'Administrator')),
     "Reason" text NOT NULL
-        CHECK ("Reason" IN ('CriteriaMatched', 'ManualRevocation', 'AchievementDeletion')),
+        CHECK ("Reason" IN ('CriteriaMatched', 'ManualGrant', 'ManualRevocation', 'AchievementDeletion', 'PrerequisiteRevocation', 'ManualGrantStudentNotFound', 'ManualGrantEnrollmentMissing', 'ManualGrantAlreadyExists', 'ManualGrantPrerequisiteMissing')),
     "CriterionExpression" text NULL,
     "CriterionScope" text NULL
         CHECK ("CriterionScope" IS NULL OR "CriterionScope" IN ('SameMark', 'AcrossCourse', 'AllLabs'))
 );
+
+DO $$
+DECLARE
+    reason_constraint_name text;
+    event_type_constraint_name text;
+    award_snapshot_constraint_name text;
+BEGIN
+    ALTER TABLE "achievement_award_audit_events"
+        ALTER COLUMN "AwardID" DROP NOT NULL,
+        ALTER COLUMN "AwardedAt" DROP NOT NULL;
+
+    FOR event_type_constraint_name IN
+        SELECT constraint_item.conname
+        FROM pg_constraint constraint_item
+        WHERE constraint_item.conrelid = 'achievement_award_audit_events'::regclass
+          AND constraint_item.contype = 'c'
+          AND pg_get_constraintdef(constraint_item.oid) LIKE '%"EventType"%'
+    LOOP
+        EXECUTE format(
+            'ALTER TABLE "achievement_award_audit_events" DROP CONSTRAINT %I',
+            event_type_constraint_name);
+    END LOOP;
+
+    FOR reason_constraint_name IN
+        SELECT constraint_item.conname
+        FROM pg_constraint constraint_item
+        WHERE constraint_item.conrelid = 'achievement_award_audit_events'::regclass
+          AND constraint_item.contype = 'c'
+          AND pg_get_constraintdef(constraint_item.oid) LIKE '%"Reason"%'
+    LOOP
+        EXECUTE format(
+            'ALTER TABLE "achievement_award_audit_events" DROP CONSTRAINT %I',
+            reason_constraint_name);
+    END LOOP;
+
+    FOR award_snapshot_constraint_name IN
+        SELECT constraint_item.conname
+        FROM pg_constraint constraint_item
+        WHERE constraint_item.conrelid = 'achievement_award_audit_events'::regclass
+          AND constraint_item.contype = 'c'
+          AND pg_get_constraintdef(constraint_item.oid) LIKE '%"AwardID"%'
+          AND pg_get_constraintdef(constraint_item.oid) LIKE '%"AwardedAt"%'
+    LOOP
+        EXECUTE format(
+            'ALTER TABLE "achievement_award_audit_events" DROP CONSTRAINT %I',
+            award_snapshot_constraint_name);
+    END LOOP;
+
+    ALTER TABLE "achievement_award_audit_events"
+        ADD CONSTRAINT "CK_achievement_award_audit_events_EventType"
+        CHECK ("EventType" IN ('Granted', 'Revoked', 'Rejected'));
+
+    ALTER TABLE "achievement_award_audit_events"
+        ADD CONSTRAINT "CK_achievement_award_audit_events_Reason"
+        CHECK ("Reason" IN ('CriteriaMatched', 'ManualGrant', 'ManualRevocation', 'AchievementDeletion', 'PrerequisiteRevocation', 'ManualGrantStudentNotFound', 'ManualGrantEnrollmentMissing', 'ManualGrantAlreadyExists', 'ManualGrantPrerequisiteMissing'));
+
+    ALTER TABLE "achievement_award_audit_events"
+        ADD CONSTRAINT "CK_achievement_award_audit_events_AwardSnapshot"
+        CHECK ("EventType" = 'Rejected' OR ("AwardID" IS NOT NULL AND "AwardedAt" IS NOT NULL));
+END $$;
 
 CREATE INDEX IF NOT EXISTS "IX_achievement_award_audit_events_CourseID_Year_OccurredAt"
     ON "achievement_award_audit_events" ("CourseID", "Year", "OccurredAt");

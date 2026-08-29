@@ -8,10 +8,10 @@ namespace Platform.DataAccess.Postgress;
 public sealed class AchievementAwardAuditEventEntity
 {
     public Guid Id { get; set; }
-    public Guid AwardID { get; set; }
+    public Guid? AwardID { get; set; }
     public AchievementAwardAuditEventType EventType { get; set; }
     public DateTime OccurredAt { get; set; }
-    public DateTime AwardedAt { get; set; }
+    public DateTime? AwardedAt { get; set; }
     public Guid StudentID { get; set; }
     public Guid AchievementID { get; set; }
     public string AchievementTitle { get; set; } = string.Empty;
@@ -27,7 +27,8 @@ public sealed class AchievementAwardAuditEventEntity
 public enum AchievementAwardAuditEventType
 {
     Granted,
-    Revoked
+    Revoked,
+    Rejected
 }
 
 public enum AchievementAwardAuditActorRole
@@ -40,6 +41,12 @@ public enum AchievementAwardAuditActorRole
 public enum AchievementAwardAuditReason
 {
     CriteriaMatched,
+    ManualGrant,
     ManualRevocation,
-    AchievementDeletion
+    AchievementDeletion,
+    PrerequisiteRevocation,
+    ManualGrantStudentNotFound,
+    ManualGrantEnrollmentMissing,
+    ManualGrantAlreadyExists,
+    ManualGrantPrerequisiteMissing
 }

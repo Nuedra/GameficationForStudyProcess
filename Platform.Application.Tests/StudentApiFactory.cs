@@ -573,6 +573,54 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
                             ]
                         }
                     ]
+                },
+                new AppraisalPayloadDto
+                {
+                    StudentId = CourseZeroAchievementStudentId,
+                    CourseId = CourseId,
+                    Year = 2026,
+                    AppraisalLists =
+                    [
+                        new AppraisalListDto
+                        {
+                            ListId = Guid.Parse("88888888-8888-8888-8888-888888888889"),
+                            ListName = "Тестовая ведомость для каскада",
+                            DateCreated = new DateTimeOffset(
+                                2026,
+                                3,
+                                1,
+                                0,
+                                0,
+                                0,
+                                TimeSpan.Zero),
+                            DateClosed = null,
+                            Marks =
+                            [
+                                new AppraisalMarkDto
+                                {
+                                    ColumnId = Guid.Parse(
+                                        "99999999-9999-9999-9999-999999999998"),
+                                    ColumnName = "Тестовая лабораторная для каскада",
+                                    IsComputed = false,
+                                    MaxScore = 10,
+                                    MinAcceptScore = 6,
+                                    Score = 10,
+                                    ScoreSourceName = "Преподаватель",
+                                    UpdatedAt = new DateTimeOffset(
+                                        2026,
+                                        3,
+                                        2,
+                                        0,
+                                        0,
+                                        0,
+                                        TimeSpan.Zero),
+                                    Tags = ["template_achievement_3"],
+                                    Deadline = null,
+                                    UploadedAt = null
+                                }
+                            ]
+                        }
+                    ]
                 }
             ];
 

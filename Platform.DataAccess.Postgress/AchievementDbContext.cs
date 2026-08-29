@@ -136,12 +136,12 @@ public sealed class AchievementDbContext(DbContextOptions<AchievementDbContext> 
             entity.ToTable("achievement_award_audit_events");
             entity.HasKey(auditEvent => auditEvent.Id);
 
-            entity.Property(auditEvent => auditEvent.AwardID).IsRequired();
+            entity.Property(auditEvent => auditEvent.AwardID).IsRequired(false);
             entity.Property(auditEvent => auditEvent.EventType)
                 .HasConversion<string>()
                 .IsRequired();
             entity.Property(auditEvent => auditEvent.OccurredAt).IsRequired();
-            entity.Property(auditEvent => auditEvent.AwardedAt).IsRequired();
+            entity.Property(auditEvent => auditEvent.AwardedAt).IsRequired(false);
             entity.Property(auditEvent => auditEvent.StudentID).IsRequired();
             entity.Property(auditEvent => auditEvent.AchievementID).IsRequired();
             entity.Property(auditEvent => auditEvent.AchievementTitle).IsRequired();
@@ -180,16 +180,19 @@ public sealed class AchievementDbContext(DbContextOptions<AchievementDbContext> 
             {
                 table.HasCheckConstraint(
                     "CK_achievement_award_audit_events_EventType",
-                    "\"EventType\" IN ('Granted', 'Revoked')");
+                    "\"EventType\" IN ('Granted', 'Revoked', 'Rejected')");
                 table.HasCheckConstraint(
                     "CK_achievement_award_audit_events_ActorRole",
                     "\"ActorRole\" IN ('System', 'Teacher', 'Administrator')");
                 table.HasCheckConstraint(
                     "CK_achievement_award_audit_events_Reason",
-                    "\"Reason\" IN ('CriteriaMatched', 'ManualRevocation', 'AchievementDeletion')");
+                    "\"Reason\" IN ('CriteriaMatched', 'ManualGrant', 'ManualRevocation', 'AchievementDeletion', 'PrerequisiteRevocation', 'ManualGrantStudentNotFound', 'ManualGrantEnrollmentMissing', 'ManualGrantAlreadyExists', 'ManualGrantPrerequisiteMissing')");
                 table.HasCheckConstraint(
                     "CK_achievement_award_audit_events_CriterionScope",
                     "\"CriterionScope\" IS NULL OR \"CriterionScope\" IN ('SameMark', 'AcrossCourse', 'AllLabs')");
+                table.HasCheckConstraint(
+                    "CK_achievement_award_audit_events_AwardSnapshot",
+                    "\"EventType\" = 'Rejected' OR (\"AwardID\" IS NOT NULL AND \"AwardedAt\" IS NOT NULL)");
             });
         });
     }

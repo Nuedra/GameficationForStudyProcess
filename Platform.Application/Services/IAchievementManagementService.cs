@@ -46,6 +46,15 @@ public interface IAchievementManagementService
         Guid achievementId,
         CancellationToken cancellationToken = default);
 
+    Task<AchievementManagementResult> GrantAwardAsync(
+        Guid userId,
+        UserRole role,
+        Guid courseId,
+        int year,
+        Guid achievementId,
+        Guid studentId,
+        CancellationToken cancellationToken = default);
+
     Task<AchievementManagementResult> RevokeAwardAsync(
         Guid userId,
         UserRole role,
@@ -91,6 +100,10 @@ public enum AchievementManagementStatus
     AchievementNotFound,
     CriteriaNotFound,
     AwardNotFound,
+    StudentNotFound,
+    StudentCourseEnrollmentRequired,
+    AwardAlreadyExists,
+    AchievementPrerequisiteMissing,
     InvalidAchievement,
     InvalidCriteria,
     DuplicateTitle,
