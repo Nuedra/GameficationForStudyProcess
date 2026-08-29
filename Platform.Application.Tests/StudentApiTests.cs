@@ -194,9 +194,10 @@ public sealed class StudentApiTests(StudentApiFactory factory)
             "/api/staff/courses",
             JsonOptions);
 
-        Assert.Equal(2, courses!.Count);
+        Assert.Equal(3, courses!.Count);
         Assert.Contains(courses, course => course.Id == StudentApiFactory.CourseId);
         Assert.Contains(courses, course => course.Id == StudentApiFactory.OtherCourseId);
+        Assert.Contains(courses, course => course.Id == StudentApiFactory.AdditionalCourseId);
     }
 
     [Fact]
@@ -266,11 +267,18 @@ public sealed class StudentApiTests(StudentApiFactory factory)
             "/api/student/courses",
             JsonOptions);
 
-        var course = Assert.Single(courses!);
+        Assert.Equal(2, courses!.Count);
+        var course = Assert.Single(courses.Where(
+            course => course.Id == StudentApiFactory.CourseId));
         Assert.Equal(StudentApiFactory.CourseId, course.Id);
         Assert.Equal("Алгоритмы", course.Title);
         Assert.Equal("Основной тестовый курс", course.Description);
         Assert.Equal(2026, course.Year);
+
+        var additionalCourse = Assert.Single(courses.Where(
+            course => course.Id == StudentApiFactory.AdditionalCourseId));
+        Assert.Equal("Дискретная математика", additionalCourse.Title);
+        Assert.Equal(2026, additionalCourse.Year);
     }
 
     [Fact]
@@ -281,6 +289,27 @@ public sealed class StudentApiTests(StudentApiFactory factory)
 
         var response = await client.GetAsync(
             $"/api/student/courses/{StudentApiFactory.CourseId}/2026/achievements/graph");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/xml", response.Content.Headers.ContentType!.MediaType);
+
+        var xml = await response.Content.ReadAsStringAsync();
+        var document = XDocument.Parse(xml);
+
+        Assert.Equal("earned", GetNodeStatus(document, "earned"));
+        Assert.Equal("available", GetNodeStatus(document, "available"));
+        Assert.Equal("locked", GetNodeStatus(document, "not-from-db"));
+        Assert.Equal("available", GetEdgeStatus(document, "edge-earned-available"));
+    }
+
+    [Fact]
+    public async Task AchievementGraph_AdditionalCourse_UsesTemplateCriteriaMapping()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.StudentId);
+
+        var response = await client.GetAsync(
+            $"/api/student/courses/{StudentApiFactory.AdditionalCourseId}/2026/achievements/graph");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("application/xml", response.Content.Headers.ContentType!.MediaType);
@@ -306,6 +335,130 @@ public sealed class StudentApiTests(StudentApiFactory factory)
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         var error = await response.Content.ReadFromJsonAsync<ApiErrorDto>(JsonOptions);
         Assert.Equal("course_access_denied", error!.Code);
+    }
+
+    [Fact]
+    public async Task Leaderboard_OwnCourse_ReturnsCourseStudentsOrderedByAchievementCount()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.StudentId);
+
+        var entries = await client.GetFromJsonAsync<List<LeaderboardEntryDto>>(
+            $"/api/student/courses/{StudentApiFactory.CourseId}/2026/leaderboard",
+            JsonOptions);
+
+        Assert.Collection(
+            entries!,
+            entry =>
+            {
+                Assert.Equal(StudentApiFactory.CoursePeerStudentId, entry.StudentId);
+                Assert.Equal("Мария Сидорова", entry.StudentName);
+                Assert.Equal("ИВТ-101", entry.Group);
+                Assert.Equal(2, entry.AchievementCount);
+            },
+            entry =>
+            {
+                Assert.Equal(StudentApiFactory.StudentId, entry.StudentId);
+                Assert.Equal("Иван Иванов", entry.StudentName);
+                Assert.Equal("ИВТ-101", entry.Group);
+                Assert.Equal(1, entry.AchievementCount);
+            },
+            entry =>
+            {
+                Assert.Equal(
+                    StudentApiFactory.CourseZeroAchievementStudentId,
+                    entry.StudentId);
+                Assert.Equal("Анна Смирнова", entry.StudentName);
+                Assert.Equal("ИВТ-101", entry.Group);
+                Assert.Equal(0, entry.AchievementCount);
+            });
+        Assert.DoesNotContain(entries!, entry =>
+            entry.StudentId == StudentApiFactory.OtherStudentId);
+    }
+
+    [Fact]
+    public async Task Leaderboard_AdditionalCourse_ReturnsSelectedCourseStudentsWithIndependentCounts()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.StudentId);
+
+        var entries = await client.GetFromJsonAsync<List<LeaderboardEntryDto>>(
+            $"/api/student/courses/{StudentApiFactory.AdditionalCourseId}/2026/leaderboard",
+            JsonOptions);
+
+        Assert.Collection(
+            entries!,
+            entry =>
+            {
+                Assert.Equal(
+                    StudentApiFactory.AdditionalCourseLeaderStudentId,
+                    entry.StudentId);
+                Assert.Equal("Сергей Васильев", entry.StudentName);
+                Assert.Equal("ИВТ-101", entry.Group);
+                Assert.Equal(3, entry.AchievementCount);
+            },
+            entry =>
+            {
+                Assert.Equal(StudentApiFactory.StudentId, entry.StudentId);
+                Assert.Equal("Иван Иванов", entry.StudentName);
+                Assert.Equal("ИВТ-101", entry.Group);
+                Assert.Equal(1, entry.AchievementCount);
+            },
+            entry =>
+            {
+                Assert.Equal(
+                    StudentApiFactory.AdditionalCourseTrailingStudentId,
+                    entry.StudentId);
+                Assert.Equal("Ольга Кузнецова", entry.StudentName);
+                Assert.Equal("ИВТ-101", entry.Group);
+                Assert.Equal(0, entry.AchievementCount);
+            });
+        Assert.DoesNotContain(entries!, entry =>
+            entry.StudentId == StudentApiFactory.CoursePeerStudentId);
+        Assert.DoesNotContain(entries!, entry =>
+            entry.StudentId == StudentApiFactory.OtherStudentId);
+    }
+
+    [Fact]
+    public async Task Leaderboard_ForeignCourse_ReturnsForbidden()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.StudentId);
+
+        var response = await client.GetAsync(
+            $"/api/student/courses/{StudentApiFactory.OtherCourseId}/2026/leaderboard");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ApiErrorDto>(JsonOptions);
+        Assert.Equal("course_access_denied", error!.Code);
+    }
+
+    [Fact]
+    public async Task Leaderboard_MissingCourse_ReturnsNotFound()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.StudentId);
+
+        var missingCourseId = Guid.Parse("a1000000-0000-0000-0000-000000000999");
+        var response = await client.GetAsync(
+            $"/api/student/courses/{missingCourseId}/2026/leaderboard");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ApiErrorDto>(JsonOptions);
+        Assert.Equal("course_not_found", error!.Code);
+    }
+
+    [Fact]
+    public async Task Leaderboard_WithoutAuthentication_ReturnsUnauthorizedJson()
+    {
+        using var client = CreateClient();
+
+        var response = await client.GetAsync(
+            $"/api/student/courses/{StudentApiFactory.CourseId}/2026/leaderboard");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ApiErrorDto>(JsonOptions);
+        Assert.Equal("authentication_required", error!.Code);
     }
 
     [Fact]

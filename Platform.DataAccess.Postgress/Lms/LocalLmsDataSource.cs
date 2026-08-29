@@ -85,6 +85,32 @@ public sealed class LocalLmsDataSource(LocalLmsDbContext dbContext) :
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<LmsCourseStudent>> GetActiveCourseInstanceStudentsAsync(
+        Guid courseId,
+        int year,
+        DateTimeOffset effectiveAt,
+        CancellationToken cancellationToken = default)
+    {
+        var effectiveAtUtc = effectiveAt.UtcDateTime;
+
+        return await dbContext.CourseInstanceStudents
+            .AsNoTracking()
+            .Where(enrollment =>
+                enrollment.CourseID == courseId &&
+                enrollment.Year == year &&
+                enrollment.StartDate <= effectiveAtUtc &&
+                (!enrollment.EndDate.HasValue || enrollment.EndDate.Value >= effectiveAtUtc))
+            .OrderBy(enrollment => enrollment.Student.Surname)
+            .ThenBy(enrollment => enrollment.Student.Name)
+            .Select(enrollment => new LmsCourseStudent(
+                enrollment.PersonID,
+                enrollment.Student.Name,
+                null,
+                enrollment.Student.Surname,
+                enrollment.Student.Group))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<LmsCourseInstance>> GetAllCourseInstancesAsync(
         CancellationToken cancellationToken = default)
     {

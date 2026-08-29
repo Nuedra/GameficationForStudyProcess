@@ -127,6 +127,76 @@ a, .btn-link {
     overflow: auto;
 }
 
+/* Leaderboard page */
+.leaderboard-title {
+    max-width: 520px;
+    margin-left: auto;
+    margin-right: auto;
+    text-align: center;
+}
+
+.leaderboard-course-select {
+    max-width: 640px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.leaderboard-course-select .form-label {
+    display: block;
+    text-align: center;
+}
+
+.leaderboard-table-wrap {
+    max-width: 520px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.leaderboard-table {
+    border: 1px solid #dee2e6;
+}
+
+.leaderboard-table th,
+.leaderboard-table td {
+    text-align: center;
+}
+
+.leaderboard-table th:last-child,
+.leaderboard-table td:last-child {
+    width: 8rem;
+    white-space: nowrap;
+}
+
+.leaderboard-table thead th {
+    background: #f8f9fa;
+    font-weight: 600;
+}
+
+.leaderboard-student-name {
+    font-weight: 600;
+}
+
+.leaderboard-student-group {
+    color: #6c757d;
+    font-size: 0.875rem;
+}
+
+.leaderboard-count {
+    display: inline-flex;
+    min-width: 2.25rem;
+    justify-content: center;
+    border-radius: 999px;
+    background: #eef4ff;
+    color: #174ea6;
+    font-weight: 700;
+    padding: 0.2rem 0.65rem;
+}
+
+.leaderboard-current-student .leaderboard-count {
+    background: #1b6ec2;
+    color: #fff;
+}
+
 /* ── Blazor errors ── */
 #blazor-error-ui {
     background: lightyellow;

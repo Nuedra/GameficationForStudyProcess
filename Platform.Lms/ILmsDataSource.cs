@@ -26,4 +26,10 @@ public interface ILmsDataSource
         Guid personId,
         DateTimeOffset effectiveAt,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<LmsCourseStudent>> GetActiveCourseInstanceStudentsAsync(
+        Guid courseId,
+        int year,
+        DateTimeOffset effectiveAt,
+        CancellationToken cancellationToken = default);
 }
