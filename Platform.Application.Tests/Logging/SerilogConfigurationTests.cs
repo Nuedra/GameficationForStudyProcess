@@ -23,6 +23,7 @@ public sealed class SerilogConfigurationTests
         { typeof(UserIdentityService).FullName!, true, false },
         { typeof(UserSessionService).FullName!, true, false },
         { typeof(AchievementManagementService).FullName!, false, true },
+        { typeof(StaffCourseExportService).FullName!, false, true },
         { typeof(TeachingAssignmentService).FullName!, false, true },
         { typeof(StudentCoursesController).FullName!, false, false }
     };

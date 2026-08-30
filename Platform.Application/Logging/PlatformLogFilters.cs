@@ -16,6 +16,7 @@ internal static class PlatformLogFilters
     private static readonly string[] BusinessSources =
     [
         "Platform.Application.Services.AchievementManagementService",
+        "Platform.Application.Services.StaffCourseExportService",
         "Platform.Application.Services.TeachingAssignmentService"
     ];
 
