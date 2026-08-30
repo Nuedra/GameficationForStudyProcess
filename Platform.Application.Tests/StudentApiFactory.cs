@@ -247,6 +247,7 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
             Id = AdditionalCourseEarnedAchievementId,
             Title = "Первый коммит",
             Description = "Полученная ачивка дополнительного курса",
+            Rarity = AchievementRarity.Rare,
             CourseID = AdditionalCourseId,
             Year = 2026
         };

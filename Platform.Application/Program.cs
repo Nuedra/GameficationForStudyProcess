@@ -170,6 +170,7 @@ try
     builder.Services.AddScoped<IUserSessionService, UserSessionService>();
     builder.Services.AddScoped<IStudentCourseService, StudentCourseService>();
     builder.Services.AddScoped<IStudentLeaderboardService, StudentLeaderboardService>();
+    builder.Services.AddScoped<IStudentStatisticsService, StudentStatisticsService>();
     builder.Services.AddScoped<IStaffCourseService, StaffCourseService>();
     builder.Services.AddScoped<IStaffCourseExportService, StaffCourseExportService>();
     builder.Services.AddScoped<ITeachingAssignmentService, TeachingAssignmentService>();
