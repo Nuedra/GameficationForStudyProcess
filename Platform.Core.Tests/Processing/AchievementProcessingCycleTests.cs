@@ -40,7 +40,7 @@ public sealed class AchievementProcessingCycleTests
         Assert.False(assigned.IsNotificationSeen);
         Assert.False(assigned.IsFirstAnimationShown);
         var auditEvent = Assert.Single(await db.AchievementAwardAuditEvents.ToListAsync());
-        Assert.Equal(assigned.Id, auditEvent.AwardID);
+        Assert.Equal(assigned.Id, auditEvent.AwardID!.Value);
         Assert.Equal(AchievementAwardAuditEventType.Granted, auditEvent.EventType);
         Assert.Equal(AchievementAwardAuditActorRole.System, auditEvent.ActorRole);
         Assert.Equal(AchievementAwardAuditReason.CriteriaMatched, auditEvent.Reason);
@@ -48,7 +48,7 @@ public sealed class AchievementProcessingCycleTests
         Assert.Equal(achievement.Id, auditEvent.AchievementID);
         Assert.Equal("tag1, tag2", auditEvent.CriterionExpression);
         Assert.Equal(foundAt.UtcDateTime, auditEvent.OccurredAt);
-        Assert.Equal(uploadedAt.UtcDateTime, auditEvent.AwardedAt);
+        Assert.Equal(uploadedAt.UtcDateTime, auditEvent.AwardedAt!.Value);
     }
 
     [Fact]
@@ -540,6 +540,13 @@ public sealed class AchievementProcessingCycleTests
             DateTimeOffset effectiveAt,
             CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<LmsCourseInstance>>([]);
+
+        public Task<IReadOnlyList<LmsCourseStudent>> GetActiveCourseInstanceStudentsAsync(
+            Guid courseId,
+            int year,
+            DateTimeOffset effectiveAt,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<LmsCourseStudent>>([]);
     }
 
     private sealed class FixedTimeProvider(DateTimeOffset currentTime) : TimeProvider

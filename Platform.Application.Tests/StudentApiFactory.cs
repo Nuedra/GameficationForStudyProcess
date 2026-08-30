@@ -19,6 +19,14 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
         Guid.Parse("b0000000-0000-0000-0000-000000000001");
     public static readonly Guid OtherStudentId =
         Guid.Parse("b0000000-0000-0000-0000-000000000002");
+    public static readonly Guid CoursePeerStudentId =
+        Guid.Parse("b0000000-0000-0000-0000-000000000003");
+    public static readonly Guid CourseZeroAchievementStudentId =
+        Guid.Parse("b0000000-0000-0000-0000-000000000004");
+    public static readonly Guid AdditionalCourseLeaderStudentId =
+        Guid.Parse("b0000000-0000-0000-0000-000000000005");
+    public static readonly Guid AdditionalCourseTrailingStudentId =
+        Guid.Parse("b0000000-0000-0000-0000-000000000006");
     public static readonly Guid TeacherId =
         Guid.Parse("b1000000-0000-0000-0000-000000000001");
     public static readonly Guid AdministratorId =
@@ -27,10 +35,20 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
         Guid.Parse("a1000000-0000-0000-0000-000000000001");
     public static readonly Guid OtherCourseId =
         Guid.Parse("a1000000-0000-0000-0000-000000000002");
+    public static readonly Guid AdditionalCourseId =
+        Guid.Parse("a1000000-0000-0000-0000-000000000003");
     public static readonly Guid EarnedAchievementId =
         Guid.Parse("00000000-0000-0000-0000-000000000002");
     public static readonly Guid LockedAchievementId =
         Guid.Parse("00000000-0000-0000-0000-000000000003");
+    public static readonly Guid BonusAchievementId =
+        Guid.Parse("00000000-0000-0000-0000-000000000005");
+    public static readonly Guid AdditionalCourseEarnedAchievementId =
+        Guid.Parse("00000000-0000-0000-0000-000000000101");
+    public static readonly Guid AdditionalCourseAvailableAchievementId =
+        Guid.Parse("00000000-0000-0000-0000-000000000102");
+    public static readonly Guid AdditionalCourseBonusAchievementId =
+        Guid.Parse("00000000-0000-0000-0000-000000000103");
 
     private readonly string _databaseName = Guid.NewGuid().ToString();
     private readonly object _databaseLock = new();
@@ -130,6 +148,34 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
             Surname = "Петров",
             Group = "ИВТ-102"
         };
+        var coursePeerStudent = new StudentEntity
+        {
+            Id = CoursePeerStudentId,
+            Name = "Мария",
+            Surname = "Сидорова",
+            Group = "ИВТ-101"
+        };
+        var courseZeroAchievementStudent = new StudentEntity
+        {
+            Id = CourseZeroAchievementStudentId,
+            Name = "Анна",
+            Surname = "Смирнова",
+            Group = "ИВТ-101"
+        };
+        var additionalCourseLeaderStudent = new StudentEntity
+        {
+            Id = AdditionalCourseLeaderStudentId,
+            Name = "Сергей",
+            Surname = "Васильев",
+            Group = "ИВТ-101"
+        };
+        var additionalCourseTrailingStudent = new StudentEntity
+        {
+            Id = AdditionalCourseTrailingStudentId,
+            Name = "Ольга",
+            Surname = "Кузнецова",
+            Group = "ИВТ-101"
+        };
         var course = new CourseEntity
         {
             Id = CourseId,
@@ -144,6 +190,13 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
             Description = "Курс другого студента",
             ContentScopeID = Guid.NewGuid()
         };
+        var additionalCourse = new CourseEntity
+        {
+            Id = AdditionalCourseId,
+            Title = "Дискретная математика",
+            Description = "Дополнительный курс текущего студента",
+            ContentScopeID = Guid.NewGuid()
+        };
         var courseInstance = new CourseInstanceEntity
         {
             CourseID = CourseId,
@@ -154,6 +207,13 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
         var otherCourseInstance = new CourseInstanceEntity
         {
             CourseID = OtherCourseId,
+            Year = 2026,
+            ContentScopeID = Guid.NewGuid(),
+            CreatedAt = DateTime.UtcNow
+        };
+        var additionalCourseInstance = new CourseInstanceEntity
+        {
+            CourseID = AdditionalCourseId,
             Year = 2026,
             ContentScopeID = Guid.NewGuid(),
             CreatedAt = DateTime.UtcNow
@@ -174,6 +234,39 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
             CourseID = CourseId,
             Year = 2026
         };
+        var bonusAchievement = new AchievementEntity
+        {
+            Id = BonusAchievementId,
+            Title = "Командная работа",
+            Description = "Дополнительная тестовая ачивка",
+            CourseID = CourseId,
+            Year = 2026
+        };
+        var additionalCourseEarnedAchievement = new AchievementEntity
+        {
+            Id = AdditionalCourseEarnedAchievementId,
+            Title = "Первый коммит",
+            Description = "Полученная ачивка дополнительного курса",
+            Rarity = AchievementRarity.Rare,
+            CourseID = AdditionalCourseId,
+            Year = 2026
+        };
+        var additionalCourseAvailableAchievement = new AchievementEntity
+        {
+            Id = AdditionalCourseAvailableAchievementId,
+            Title = "Полпути пройдено!",
+            Description = "Доступная ачивка дополнительного курса",
+            CourseID = AdditionalCourseId,
+            Year = 2026
+        };
+        var additionalCourseBonusAchievement = new AchievementEntity
+        {
+            Id = AdditionalCourseBonusAchievementId,
+            Title = "Образцовый студент",
+            Description = "Дополнительная ачивка для таблицы лидеров",
+            CourseID = AdditionalCourseId,
+            Year = 2026
+        };
         var lockedCriteria = new AchievementCriteriaEntity
         {
             Id = Guid.NewGuid(),
@@ -184,20 +277,91 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
             Scope = AchievementCriteriaScope.SameMark
         };
         lockedAchievement.Criteria = lockedCriteria;
+        var additionalCourseEarnedCriteria = new AchievementCriteriaEntity
+        {
+            Id = Guid.NewGuid(),
+            AchievementID = AdditionalCourseEarnedAchievementId,
+            Achievement = additionalCourseEarnedAchievement,
+            Expression = "template_achievement_2",
+            IsEnabled = true,
+            Scope = AchievementCriteriaScope.SameMark
+        };
+        var additionalCourseAvailableCriteria = new AchievementCriteriaEntity
+        {
+            Id = Guid.NewGuid(),
+            AchievementID = AdditionalCourseAvailableAchievementId,
+            Achievement = additionalCourseAvailableAchievement,
+            Expression = "template_achievement_3",
+            IsEnabled = true,
+            Scope = AchievementCriteriaScope.SameMark
+        };
+        additionalCourseEarnedAchievement.Criteria = additionalCourseEarnedCriteria;
+        additionalCourseAvailableAchievement.Criteria = additionalCourseAvailableCriteria;
 
         lmsDbContext.AddRange(
             student,
             otherStudent,
+            coursePeerStudent,
+            courseZeroAchievementStudent,
+            additionalCourseLeaderStudent,
+            additionalCourseTrailingStudent,
             course,
             otherCourse,
+            additionalCourse,
             courseInstance,
             otherCourseInstance,
+            additionalCourseInstance,
             new CourseInstanceStudentEntity
             {
                 CourseID = CourseId,
                 Year = 2026,
                 PersonID = StudentId,
                 Student = student,
+                CourseInstance = courseInstance,
+                StartDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+            },
+            new CourseInstanceStudentEntity
+            {
+                CourseID = AdditionalCourseId,
+                Year = 2026,
+                PersonID = StudentId,
+                Student = student,
+                CourseInstance = additionalCourseInstance,
+                StartDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+            },
+            new CourseInstanceStudentEntity
+            {
+                CourseID = AdditionalCourseId,
+                Year = 2026,
+                PersonID = AdditionalCourseLeaderStudentId,
+                Student = additionalCourseLeaderStudent,
+                CourseInstance = additionalCourseInstance,
+                StartDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+            },
+            new CourseInstanceStudentEntity
+            {
+                CourseID = AdditionalCourseId,
+                Year = 2026,
+                PersonID = AdditionalCourseTrailingStudentId,
+                Student = additionalCourseTrailingStudent,
+                CourseInstance = additionalCourseInstance,
+                StartDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+            },
+            new CourseInstanceStudentEntity
+            {
+                CourseID = CourseId,
+                Year = 2026,
+                PersonID = CoursePeerStudentId,
+                Student = coursePeerStudent,
+                CourseInstance = courseInstance,
+                StartDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+            },
+            new CourseInstanceStudentEntity
+            {
+                CourseID = CourseId,
+                Year = 2026,
+                PersonID = CourseZeroAchievementStudentId,
+                Student = courseZeroAchievementStudent,
                 CourseInstance = courseInstance,
                 StartDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
             },
@@ -225,7 +389,13 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
         achievementDbContext.AddRange(
             earnedAchievement,
             lockedAchievement,
+            bonusAchievement,
+            additionalCourseEarnedAchievement,
+            additionalCourseAvailableAchievement,
+            additionalCourseBonusAchievement,
             lockedCriteria,
+            additionalCourseEarnedCriteria,
+            additionalCourseAvailableCriteria,
             new StudentAchievementEntity
             {
                 Id = Guid.NewGuid(),
@@ -237,6 +407,72 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
                 AchievementFoundDate =
                     new DateTime(2026, 3, 1, 10, 5, 0, DateTimeKind.Utc)
             },
+            new StudentAchievementEntity
+            {
+                Id = Guid.NewGuid(),
+                StudentID = StudentId,
+                AchievementID = AdditionalCourseEarnedAchievementId,
+                Achievement = additionalCourseEarnedAchievement,
+                AchievementGotDate =
+                    new DateTime(2026, 4, 1, 10, 0, 0, DateTimeKind.Utc),
+                AchievementFoundDate =
+                    new DateTime(2026, 4, 1, 10, 5, 0, DateTimeKind.Utc)
+            },
+            new StudentAchievementEntity
+            {
+                Id = Guid.NewGuid(),
+                StudentID = CoursePeerStudentId,
+                AchievementID = EarnedAchievementId,
+                Achievement = earnedAchievement,
+                AchievementGotDate =
+                    new DateTime(2026, 3, 2, 10, 0, 0, DateTimeKind.Utc),
+                AchievementFoundDate =
+                    new DateTime(2026, 3, 2, 10, 5, 0, DateTimeKind.Utc)
+            },
+            new StudentAchievementEntity
+            {
+                Id = Guid.NewGuid(),
+                StudentID = CoursePeerStudentId,
+                AchievementID = BonusAchievementId,
+                Achievement = bonusAchievement,
+                AchievementGotDate =
+                    new DateTime(2026, 3, 3, 10, 0, 0, DateTimeKind.Utc),
+                AchievementFoundDate =
+                    new DateTime(2026, 3, 3, 10, 5, 0, DateTimeKind.Utc)
+            },
+            new StudentAchievementEntity
+            {
+                Id = Guid.NewGuid(),
+                StudentID = AdditionalCourseLeaderStudentId,
+                AchievementID = AdditionalCourseEarnedAchievementId,
+                Achievement = additionalCourseEarnedAchievement,
+                AchievementGotDate =
+                    new DateTime(2026, 4, 2, 10, 0, 0, DateTimeKind.Utc),
+                AchievementFoundDate =
+                    new DateTime(2026, 4, 2, 10, 5, 0, DateTimeKind.Utc)
+            },
+            new StudentAchievementEntity
+            {
+                Id = Guid.NewGuid(),
+                StudentID = AdditionalCourseLeaderStudentId,
+                AchievementID = AdditionalCourseAvailableAchievementId,
+                Achievement = additionalCourseAvailableAchievement,
+                AchievementGotDate =
+                    new DateTime(2026, 4, 3, 10, 0, 0, DateTimeKind.Utc),
+                AchievementFoundDate =
+                    new DateTime(2026, 4, 3, 10, 5, 0, DateTimeKind.Utc)
+            },
+            new StudentAchievementEntity
+            {
+                Id = Guid.NewGuid(),
+                StudentID = AdditionalCourseLeaderStudentId,
+                AchievementID = AdditionalCourseBonusAchievementId,
+                Achievement = additionalCourseBonusAchievement,
+                AchievementGotDate =
+                    new DateTime(2026, 4, 4, 10, 0, 0, DateTimeKind.Utc),
+                AchievementFoundDate =
+                    new DateTime(2026, 4, 4, 10, 5, 0, DateTimeKind.Utc)
+            },
             new AchievementConnectionEntity
             {
                 Id = Guid.NewGuid(),
@@ -244,6 +480,14 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
                 Source = earnedAchievement,
                 TargetId = LockedAchievementId,
                 Target = lockedAchievement
+            },
+            new AchievementConnectionEntity
+            {
+                Id = Guid.NewGuid(),
+                SourceId = AdditionalCourseEarnedAchievementId,
+                Source = additionalCourseEarnedAchievement,
+                TargetId = AdditionalCourseAvailableAchievementId,
+                Target = additionalCourseAvailableAchievement
             });
 
         achievementDbContext.SaveChanges();
@@ -310,6 +554,54 @@ public sealed class StudentApiFactory : WebApplicationFactory<Program>
                                     ColumnId = Guid.Parse(
                                         "99999999-9999-9999-9999-999999999999"),
                                     ColumnName = "Тестовая лабораторная",
+                                    IsComputed = false,
+                                    MaxScore = 10,
+                                    MinAcceptScore = 6,
+                                    Score = 10,
+                                    ScoreSourceName = "Преподаватель",
+                                    UpdatedAt = new DateTimeOffset(
+                                        2026,
+                                        3,
+                                        2,
+                                        0,
+                                        0,
+                                        0,
+                                        TimeSpan.Zero),
+                                    Tags = ["template_achievement_3"],
+                                    Deadline = null,
+                                    UploadedAt = null
+                                }
+                            ]
+                        }
+                    ]
+                },
+                new AppraisalPayloadDto
+                {
+                    StudentId = CourseZeroAchievementStudentId,
+                    CourseId = CourseId,
+                    Year = 2026,
+                    AppraisalLists =
+                    [
+                        new AppraisalListDto
+                        {
+                            ListId = Guid.Parse("88888888-8888-8888-8888-888888888889"),
+                            ListName = "Тестовая ведомость для каскада",
+                            DateCreated = new DateTimeOffset(
+                                2026,
+                                3,
+                                1,
+                                0,
+                                0,
+                                0,
+                                TimeSpan.Zero),
+                            DateClosed = null,
+                            Marks =
+                            [
+                                new AppraisalMarkDto
+                                {
+                                    ColumnId = Guid.Parse(
+                                        "99999999-9999-9999-9999-999999999998"),
+                                    ColumnName = "Тестовая лабораторная для каскада",
                                     IsComputed = false,
                                     MaxScore = 10,
                                     MinAcceptScore = 6,

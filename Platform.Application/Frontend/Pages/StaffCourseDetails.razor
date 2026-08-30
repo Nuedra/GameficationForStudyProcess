@@ -40,6 +40,36 @@ else if (_course is not null)
         <p>@_course.Description</p>
     }
 
+    <section class="mb-4" aria-labelledby="course-exports-title">
+        <div class="border-top border-bottom py-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div>
+                    <h2 id="course-exports-title" class="h5 mb-1">Выгрузки курса</h2>
+                    <p class="text-muted small mb-0">
+                        Полный архив содержит достижения, граф, студентов, выдачи, аудит и таблицу лидеров.
+                    </p>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    @if (!_isAdministrator)
+                    {
+                        <a class="btn btn-outline-primary"
+                           href="api/staff/courses/@CourseId/@Year/exports/teacher-report.csv"
+                           download>
+                            <span class="oi oi-data-transfer-download me-1" aria-hidden="true"></span>
+                            Скачать таблицу CSV
+                        </a>
+                    }
+                    <a class="btn btn-primary"
+                       href="api/staff/courses/@CourseId/@Year/exports/archive.zip"
+                       download>
+                        <span class="oi oi-data-transfer-download me-1" aria-hidden="true"></span>
+                        Скачать полный ZIP
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <div class="row g-3">
         <div class="col-md-4">
             <div class="card h-100"><div class="card-body">

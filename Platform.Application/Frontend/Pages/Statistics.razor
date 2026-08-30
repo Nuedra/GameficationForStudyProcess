@@ -1,0 +1,256 @@
+@page "/statistics"
+@attribute [Authorize(Roles = "student")]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IStudentCourseService StudentCourseService
+@inject IStudentStatisticsService StatisticsService
+
+<PageTitle>Статистика — Платформа достижений</PageTitle>
+
+<div class="statistics-content">
+    <h1 class="statistics-title">Статистика</h1>
+
+    @if (_isLoading)
+    {
+        <div class="d-flex justify-content-center align-items-center gap-2 mt-3">
+            <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+            <span class="text-muted">Загрузка...</span>
+        </div>
+    }
+    else if (_pageError != null)
+    {
+        <div class="alert alert-danger mt-3">
+            @_pageError
+            <button class="btn btn-outline-danger btn-sm ms-2" @onclick="LoadPageAsync">
+                Повторить
+            </button>
+        </div>
+    }
+    else if (!_isAuthenticated)
+    {
+        <div class="alert alert-warning mt-3">
+            <span class="oi oi-warning me-2" aria-hidden="true"></span>
+            Необходимо <a href="login">войти в систему</a>, чтобы просматривать статистику.
+        </div>
+    }
+    else if (_courses == null || _courses.Count == 0)
+    {
+        <div class="alert alert-info mt-3">Текущие курсы не найдены.</div>
+    }
+    else
+    {
+        <div class="statistics-course-select mb-4">
+            <label for="statisticsCourseSelect" class="form-label">Курс</label>
+            <select
+                id="statisticsCourseSelect"
+                class="form-select"
+                value="@SelectedScopeValue"
+                @onchange="OnScopeChangedAsync">
+                <option value="all">Все текущие курсы</option>
+                @foreach (var course in _courses)
+                {
+                    <option value="@CourseValue(course)">@course.Title (@course.Year)</option>
+                }
+            </select>
+        </div>
+
+        @if (_statisticsLoading)
+        {
+            <div class="statistics-results d-flex justify-content-center align-items-center gap-2">
+                <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                <span class="text-muted">Загрузка статистики...</span>
+            </div>
+        }
+        else if (_statisticsError != null)
+        {
+            <div class="alert alert-danger">
+                @_statisticsError
+                <button class="btn btn-outline-danger btn-sm ms-2" @onclick="LoadStatisticsAsync">
+                    Повторить
+                </button>
+            </div>
+        }
+        else if (_statistics != null)
+        {
+            <section class="statistics-results" aria-live="polite">
+                <div class="statistics-total">
+                    <span class="oi oi-badge statistics-total-icon" aria-hidden="true"></span>
+                    <div>
+                        <div class="statistics-total-label">Всего получено</div>
+                        <div class="statistics-total-value">@_statistics.TotalAchievements</div>
+                    </div>
+                </div>
+
+                <div class="statistics-grid mt-3">
+                    @foreach (var rarity in Enum.GetValues<AchievementRarity>())
+                    {
+                        <div class="statistics-item @RarityClass(rarity)">
+                            <span class="statistics-swatch" aria-hidden="true"></span>
+                            <div class="statistics-item-label">@RarityLabel(rarity)</div>
+                            <div class="statistics-item-value">@CountFor(rarity)</div>
+                        </div>
+                    }
+                </div>
+            </section>
+        }
+    }
+</div>
+
+@code {
+    private const string AllCoursesValue = "all";
+
+    private bool _isLoading = true;
+    private bool _isAuthenticated;
+    private IReadOnlyList<CourseDto>? _courses;
+    private StudentStatisticsDto? _statistics;
+    private Guid _studentId;
+    private Guid _selectedCourseId;
+    private int _selectedYear;
+    private bool _statisticsLoading;
+    private string? _pageError;
+    private string? _statisticsError;
+
+    private string SelectedScopeValue =>
+        _selectedCourseId == Guid.Empty
+            ? AllCoursesValue
+            : $"{_selectedCourseId}:{_selectedYear}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPageAsync();
+    }
+
+    private async Task LoadPageAsync()
+    {
+        _isLoading = true;
+        _pageError = null;
+        _statisticsError = null;
+
+        try
+        {
+            var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            if (!authenticationState.User.TryGetUserId(out _studentId))
+            {
+                _isAuthenticated = false;
+                return;
+            }
+
+            _isAuthenticated = true;
+            _selectedCourseId = Guid.Empty;
+            _selectedYear = 0;
+            _courses = await StudentCourseService.GetCoursesAsync(_studentId);
+        }
+        catch
+        {
+            _pageError = "Не удалось загрузить список текущих курсов.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+
+        if (_isAuthenticated && _pageError == null && _courses is { Count: > 0 })
+            await LoadStatisticsAsync();
+    }
+
+    private async Task OnScopeChangedAsync(ChangeEventArgs eventArgs)
+    {
+        var value = eventArgs.Value?.ToString();
+        if (value == AllCoursesValue)
+        {
+            _selectedCourseId = Guid.Empty;
+            _selectedYear = 0;
+        }
+        else if (TryParseCourseValue(value, out var courseId, out var year))
+        {
+            _selectedCourseId = courseId;
+            _selectedYear = year;
+        }
+        else
+        {
+            return;
+        }
+
+        await LoadStatisticsAsync();
+    }
+
+    private async Task LoadStatisticsAsync()
+    {
+        _statisticsLoading = true;
+        _statisticsError = null;
+
+        try
+        {
+            var result = _selectedCourseId == Guid.Empty
+                ? await StatisticsService.GetCurrentCoursesStatisticsAsync(_studentId)
+                : await StatisticsService.GetCourseStatisticsAsync(
+                    _studentId,
+                    _selectedCourseId,
+                    _selectedYear);
+
+            if (result.Status == StudentStatisticsQueryStatus.Success)
+            {
+                _statistics = result.Statistics;
+            }
+            else
+            {
+                _statistics = null;
+                _statisticsError = result.Status switch
+                {
+                    StudentStatisticsQueryStatus.CourseNotFound =>
+                        "Выбранный курс не найден.",
+                    StudentStatisticsQueryStatus.AccessDenied =>
+                        "Нет доступа к выбранному курсу.",
+                    _ => "Не удалось загрузить статистику."
+                };
+            }
+        }
+        catch
+        {
+            _statistics = null;
+            _statisticsError = "Не удалось загрузить статистику.";
+        }
+        finally
+        {
+            _statisticsLoading = false;
+        }
+    }
+
+    private int CountFor(AchievementRarity rarity) =>
+        _statistics?.ByRarity.FirstOrDefault(item => item.Rarity == rarity)?.Count ?? 0;
+
+    private static string RarityLabel(AchievementRarity rarity) => rarity switch
+    {
+        AchievementRarity.Common => "Обычные",
+        AchievementRarity.Rare => "Редкие",
+        AchievementRarity.Epic => "Эпические",
+        AchievementRarity.Legendary => "Легендарные",
+        _ => rarity.ToString()
+    };
+
+    private static string RarityClass(AchievementRarity rarity) => rarity switch
+    {
+        AchievementRarity.Common => "statistics-common",
+        AchievementRarity.Rare => "statistics-rare",
+        AchievementRarity.Epic => "statistics-epic",
+        AchievementRarity.Legendary => "statistics-legendary",
+        _ => string.Empty
+    };
+
+    private static string CourseValue(CourseDto course) => $"{course.Id}:{course.Year}";
+
+    private static bool TryParseCourseValue(
+        string? value,
+        out Guid courseId,
+        out int year)
+    {
+        courseId = Guid.Empty;
+        year = 0;
+
+        var colon = value?.IndexOf(':') ?? -1;
+        if (colon <= 0)
+            return false;
+
+        return Guid.TryParse(value![..colon], out courseId) &&
+            int.TryParse(value[(colon + 1)..], out year);
+    }
+}

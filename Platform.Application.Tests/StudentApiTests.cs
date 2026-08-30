@@ -194,9 +194,10 @@ public sealed class StudentApiTests(StudentApiFactory factory)
             "/api/staff/courses",
             JsonOptions);
 
-        Assert.Equal(2, courses!.Count);
+        Assert.Equal(3, courses!.Count);
         Assert.Contains(courses, course => course.Id == StudentApiFactory.CourseId);
         Assert.Contains(courses, course => course.Id == StudentApiFactory.OtherCourseId);
+        Assert.Contains(courses, course => course.Id == StudentApiFactory.AdditionalCourseId);
     }
 
     [Fact]
@@ -266,11 +267,148 @@ public sealed class StudentApiTests(StudentApiFactory factory)
             "/api/student/courses",
             JsonOptions);
 
-        var course = Assert.Single(courses!);
+        Assert.Equal(2, courses!.Count);
+        var course = Assert.Single(courses.Where(
+            course => course.Id == StudentApiFactory.CourseId));
         Assert.Equal(StudentApiFactory.CourseId, course.Id);
         Assert.Equal("Алгоритмы", course.Title);
         Assert.Equal("Основной тестовый курс", course.Description);
         Assert.Equal(2026, course.Year);
+
+        var additionalCourse = Assert.Single(courses.Where(
+            course => course.Id == StudentApiFactory.AdditionalCourseId));
+        Assert.Equal("Дискретная математика", additionalCourse.Title);
+        Assert.Equal(2026, additionalCourse.Year);
+    }
+
+    [Fact]
+    public async Task Statistics_AllCurrentCourses_AggregatesRaritiesAndExcludesForeignCourse()
+    {
+        using var client = CreateClient();
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AchievementDbContext>();
+            var foreignAchievement = new AchievementEntity
+            {
+                Id = Guid.NewGuid(),
+                Title = "Чужое достижение",
+                Description = "Не должно попасть в статистику текущих курсов",
+                Rarity = AchievementRarity.Epic,
+                CourseID = StudentApiFactory.OtherCourseId,
+                Year = 2026
+            };
+            dbContext.Achievements.Add(foreignAchievement);
+            dbContext.StudentAchievements.Add(new StudentAchievementEntity
+            {
+                Id = Guid.NewGuid(),
+                StudentID = StudentApiFactory.StudentId,
+                AchievementID = foreignAchievement.Id,
+                Achievement = foreignAchievement,
+                AchievementGotDate = new DateTime(2026, 5, 1, 10, 0, 0, DateTimeKind.Utc),
+                AchievementFoundDate = new DateTime(2026, 5, 1, 10, 5, 0, DateTimeKind.Utc)
+            });
+            await dbContext.SaveChangesAsync();
+        }
+        await Login(client, StudentApiFactory.StudentId);
+
+        var statistics = await client.GetFromJsonAsync<StudentStatisticsDto>(
+            "/api/student/statistics",
+            JsonOptions);
+
+        Assert.NotNull(statistics);
+        Assert.Equal(2, statistics.TotalAchievements);
+        Assert.Collection(
+            statistics.ByRarity,
+            item =>
+            {
+                Assert.Equal(AchievementRarity.Common, item.Rarity);
+                Assert.Equal(1, item.Count);
+            },
+            item =>
+            {
+                Assert.Equal(AchievementRarity.Rare, item.Rarity);
+                Assert.Equal(1, item.Count);
+            },
+            item =>
+            {
+                Assert.Equal(AchievementRarity.Epic, item.Rarity);
+                Assert.Equal(0, item.Count);
+            },
+            item =>
+            {
+                Assert.Equal(AchievementRarity.Legendary, item.Rarity);
+                Assert.Equal(0, item.Count);
+            });
+    }
+
+    [Fact]
+    public async Task Statistics_SelectedCourse_ReturnsOnlyThatCourseAchievements()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.StudentId);
+
+        var mainCourse = await client.GetFromJsonAsync<StudentStatisticsDto>(
+            $"/api/student/courses/{StudentApiFactory.CourseId}/2026/statistics",
+            JsonOptions);
+        var additionalCourse = await client.GetFromJsonAsync<StudentStatisticsDto>(
+            $"/api/student/courses/{StudentApiFactory.AdditionalCourseId}/2026/statistics",
+            JsonOptions);
+
+        Assert.NotNull(mainCourse);
+        Assert.Equal(1, mainCourse.TotalAchievements);
+        Assert.Equal(
+            1,
+            Assert.Single(mainCourse.ByRarity, item => item.Rarity == AchievementRarity.Common).Count);
+        Assert.Equal(
+            0,
+            Assert.Single(mainCourse.ByRarity, item => item.Rarity == AchievementRarity.Rare).Count);
+
+        Assert.NotNull(additionalCourse);
+        Assert.Equal(1, additionalCourse.TotalAchievements);
+        Assert.Equal(
+            0,
+            Assert.Single(
+                additionalCourse.ByRarity,
+                item => item.Rarity == AchievementRarity.Common).Count);
+        Assert.Equal(
+            1,
+            Assert.Single(
+                additionalCourse.ByRarity,
+                item => item.Rarity == AchievementRarity.Rare).Count);
+    }
+
+    [Fact]
+    public async Task Statistics_ForeignAndMissingCourse_UseCourseAccessRules()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.StudentId);
+
+        var foreignCourse = await client.GetAsync(
+            $"/api/student/courses/{StudentApiFactory.OtherCourseId}/2026/statistics");
+        var missingCourse = await client.GetAsync(
+            $"/api/student/courses/{Guid.NewGuid()}/2026/statistics");
+
+        Assert.Equal(HttpStatusCode.Forbidden, foreignCourse.StatusCode);
+        var foreignError = await foreignCourse.Content.ReadFromJsonAsync<ApiErrorDto>(JsonOptions);
+        Assert.Equal("course_access_denied", foreignError!.Code);
+
+        Assert.Equal(HttpStatusCode.NotFound, missingCourse.StatusCode);
+        var missingError = await missingCourse.Content.ReadFromJsonAsync<ApiErrorDto>(JsonOptions);
+        Assert.Equal("course_not_found", missingError!.Code);
+    }
+
+    [Fact]
+    public async Task Statistics_AnonymousAndStaffUser_CannotReadStudentStatistics()
+    {
+        using var anonymousClient = CreateClient();
+        var anonymousResponse = await anonymousClient.GetAsync("/api/student/statistics");
+
+        using var teacherClient = CreateClient();
+        await Login(teacherClient, StudentApiFactory.TeacherId);
+        var teacherResponse = await teacherClient.GetAsync("/api/student/statistics");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, anonymousResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, teacherResponse.StatusCode);
     }
 
     [Fact]
@@ -281,6 +419,27 @@ public sealed class StudentApiTests(StudentApiFactory factory)
 
         var response = await client.GetAsync(
             $"/api/student/courses/{StudentApiFactory.CourseId}/2026/achievements/graph");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/xml", response.Content.Headers.ContentType!.MediaType);
+
+        var xml = await response.Content.ReadAsStringAsync();
+        var document = XDocument.Parse(xml);
+
+        Assert.Equal("earned", GetNodeStatus(document, "earned"));
+        Assert.Equal("available", GetNodeStatus(document, "available"));
+        Assert.Equal("locked", GetNodeStatus(document, "not-from-db"));
+        Assert.Equal("available", GetEdgeStatus(document, "edge-earned-available"));
+    }
+
+    [Fact]
+    public async Task AchievementGraph_AdditionalCourse_UsesTemplateCriteriaMapping()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.StudentId);
+
+        var response = await client.GetAsync(
+            $"/api/student/courses/{StudentApiFactory.AdditionalCourseId}/2026/achievements/graph");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("application/xml", response.Content.Headers.ContentType!.MediaType);
@@ -306,6 +465,130 @@ public sealed class StudentApiTests(StudentApiFactory factory)
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         var error = await response.Content.ReadFromJsonAsync<ApiErrorDto>(JsonOptions);
         Assert.Equal("course_access_denied", error!.Code);
+    }
+
+    [Fact]
+    public async Task Leaderboard_OwnCourse_ReturnsCourseStudentsOrderedByAchievementCount()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.StudentId);
+
+        var entries = await client.GetFromJsonAsync<List<LeaderboardEntryDto>>(
+            $"/api/student/courses/{StudentApiFactory.CourseId}/2026/leaderboard",
+            JsonOptions);
+
+        Assert.Collection(
+            entries!,
+            entry =>
+            {
+                Assert.Equal(StudentApiFactory.CoursePeerStudentId, entry.StudentId);
+                Assert.Equal("Мария Сидорова", entry.StudentName);
+                Assert.Equal("ИВТ-101", entry.Group);
+                Assert.Equal(2, entry.AchievementCount);
+            },
+            entry =>
+            {
+                Assert.Equal(StudentApiFactory.StudentId, entry.StudentId);
+                Assert.Equal("Иван Иванов", entry.StudentName);
+                Assert.Equal("ИВТ-101", entry.Group);
+                Assert.Equal(1, entry.AchievementCount);
+            },
+            entry =>
+            {
+                Assert.Equal(
+                    StudentApiFactory.CourseZeroAchievementStudentId,
+                    entry.StudentId);
+                Assert.Equal("Анна Смирнова", entry.StudentName);
+                Assert.Equal("ИВТ-101", entry.Group);
+                Assert.Equal(0, entry.AchievementCount);
+            });
+        Assert.DoesNotContain(entries!, entry =>
+            entry.StudentId == StudentApiFactory.OtherStudentId);
+    }
+
+    [Fact]
+    public async Task Leaderboard_AdditionalCourse_ReturnsSelectedCourseStudentsWithIndependentCounts()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.StudentId);
+
+        var entries = await client.GetFromJsonAsync<List<LeaderboardEntryDto>>(
+            $"/api/student/courses/{StudentApiFactory.AdditionalCourseId}/2026/leaderboard",
+            JsonOptions);
+
+        Assert.Collection(
+            entries!,
+            entry =>
+            {
+                Assert.Equal(
+                    StudentApiFactory.AdditionalCourseLeaderStudentId,
+                    entry.StudentId);
+                Assert.Equal("Сергей Васильев", entry.StudentName);
+                Assert.Equal("ИВТ-101", entry.Group);
+                Assert.Equal(3, entry.AchievementCount);
+            },
+            entry =>
+            {
+                Assert.Equal(StudentApiFactory.StudentId, entry.StudentId);
+                Assert.Equal("Иван Иванов", entry.StudentName);
+                Assert.Equal("ИВТ-101", entry.Group);
+                Assert.Equal(1, entry.AchievementCount);
+            },
+            entry =>
+            {
+                Assert.Equal(
+                    StudentApiFactory.AdditionalCourseTrailingStudentId,
+                    entry.StudentId);
+                Assert.Equal("Ольга Кузнецова", entry.StudentName);
+                Assert.Equal("ИВТ-101", entry.Group);
+                Assert.Equal(0, entry.AchievementCount);
+            });
+        Assert.DoesNotContain(entries!, entry =>
+            entry.StudentId == StudentApiFactory.CoursePeerStudentId);
+        Assert.DoesNotContain(entries!, entry =>
+            entry.StudentId == StudentApiFactory.OtherStudentId);
+    }
+
+    [Fact]
+    public async Task Leaderboard_ForeignCourse_ReturnsForbidden()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.StudentId);
+
+        var response = await client.GetAsync(
+            $"/api/student/courses/{StudentApiFactory.OtherCourseId}/2026/leaderboard");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ApiErrorDto>(JsonOptions);
+        Assert.Equal("course_access_denied", error!.Code);
+    }
+
+    [Fact]
+    public async Task Leaderboard_MissingCourse_ReturnsNotFound()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.StudentId);
+
+        var missingCourseId = Guid.Parse("a1000000-0000-0000-0000-000000000999");
+        var response = await client.GetAsync(
+            $"/api/student/courses/{missingCourseId}/2026/leaderboard");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ApiErrorDto>(JsonOptions);
+        Assert.Equal("course_not_found", error!.Code);
+    }
+
+    [Fact]
+    public async Task Leaderboard_WithoutAuthentication_ReturnsUnauthorizedJson()
+    {
+        using var client = CreateClient();
+
+        var response = await client.GetAsync(
+            $"/api/student/courses/{StudentApiFactory.CourseId}/2026/leaderboard");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<ApiErrorDto>(JsonOptions);
+        Assert.Equal("authentication_required", error!.Code);
     }
 
     [Fact]

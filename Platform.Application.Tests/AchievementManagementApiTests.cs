@@ -175,6 +175,371 @@ public sealed class AchievementManagementApiTests(StudentApiFactory factory)
     }
 
     [Fact]
+    public async Task Teacher_CanGrantAwardWhenGraphPrerequisiteIsUnlocked()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.TeacherId);
+
+        var grant = await client.PostAsJsonAsync(
+            $"{AchievementsUrl(StudentApiFactory.CourseId)}/{StudentApiFactory.LockedAchievementId}/awards",
+            new ManualAchievementAwardRequest(StudentApiFactory.StudentId),
+            JsonOptions);
+        var audit = await client.GetAsync(
+            $"{AchievementsUrl(StudentApiFactory.CourseId)}/audit?achievementId={StudentApiFactory.LockedAchievementId}&studentId={StudentApiFactory.StudentId}");
+
+        Assert.Equal(HttpStatusCode.OK, grant.StatusCode);
+        var achievement = await grant.Content.ReadFromJsonAsync<ManagedAchievementDto>(JsonOptions);
+        Assert.True(achievement!.HasAwards);
+        Assert.Equal(1, achievement.AwardCount);
+
+        Assert.Equal(HttpStatusCode.OK, audit.StatusCode);
+        var events = await audit.Content.ReadFromJsonAsync<List<AchievementAwardAuditEventDto>>(
+            JsonOptions);
+        var auditEvent = Assert.Single(events!);
+        Assert.Equal(AchievementAwardAuditEventType.Granted, auditEvent.EventType);
+        Assert.Equal(AchievementAwardAuditReason.ManualGrant, auditEvent.Reason);
+        Assert.NotNull(auditEvent.AwardId);
+        Assert.NotNull(auditEvent.AwardedAt);
+        Assert.Equal(AchievementAwardAuditActorRole.Teacher, auditEvent.ActorRole);
+        Assert.Equal(StudentApiFactory.TeacherId, auditEvent.ActorId);
+        Assert.Equal(StudentApiFactory.StudentId, auditEvent.StudentId);
+        Assert.Equal(StudentApiFactory.LockedAchievementId, auditEvent.AchievementId);
+
+        using var verificationScope = factory.Services.CreateScope();
+        var verificationDb = verificationScope.ServiceProvider
+            .GetRequiredService<AchievementDbContext>();
+        Assert.True(await verificationDb.StudentAchievements.AnyAsync(item =>
+            item.StudentID == StudentApiFactory.StudentId &&
+            item.AchievementID == StudentApiFactory.LockedAchievementId));
+    }
+
+    [Fact]
+    public async Task Administrator_CanGrantRootAward()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.AdministratorId);
+
+        var grant = await client.PostAsJsonAsync(
+            $"{AchievementsUrl(StudentApiFactory.CourseId)}/{StudentApiFactory.EarnedAchievementId}/awards",
+            new ManualAchievementAwardRequest(StudentApiFactory.CourseZeroAchievementStudentId),
+            JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, grant.StatusCode);
+        var achievement = await grant.Content.ReadFromJsonAsync<ManagedAchievementDto>(JsonOptions);
+        Assert.Equal(3, achievement!.AwardCount);
+
+        using var verificationScope = factory.Services.CreateScope();
+        var verificationDb = verificationScope.ServiceProvider
+            .GetRequiredService<AchievementDbContext>();
+        var auditEvent = Assert.Single(await verificationDb.AchievementAwardAuditEvents
+            .Where(item =>
+                item.StudentID == StudentApiFactory.CourseZeroAchievementStudentId &&
+                item.AchievementID == StudentApiFactory.EarnedAchievementId)
+            .ToListAsync());
+        Assert.Equal(AchievementAwardAuditEventType.Granted, auditEvent.EventType);
+        Assert.Equal(AchievementAwardAuditReason.ManualGrant, auditEvent.Reason);
+        Assert.Equal(AchievementAwardAuditActorRole.Administrator, auditEvent.ActorRole);
+        Assert.Equal(StudentApiFactory.AdministratorId, auditEvent.ActorID);
+
+        var cascadedAward = Assert.Single(await verificationDb.StudentAchievements
+            .Where(item =>
+                item.StudentID == StudentApiFactory.CourseZeroAchievementStudentId &&
+                item.AchievementID == StudentApiFactory.LockedAchievementId)
+            .ToListAsync());
+        var cascadedAuditEvent = Assert.Single(await verificationDb.AchievementAwardAuditEvents
+            .Where(item =>
+                item.StudentID == StudentApiFactory.CourseZeroAchievementStudentId &&
+                item.AchievementID == StudentApiFactory.LockedAchievementId)
+            .ToListAsync());
+        Assert.Equal(cascadedAward.Id, cascadedAuditEvent.AwardID!.Value);
+        Assert.Equal(AchievementAwardAuditEventType.Granted, cascadedAuditEvent.EventType);
+        Assert.Equal(AchievementAwardAuditReason.CriteriaMatched, cascadedAuditEvent.Reason);
+        Assert.Equal(AchievementAwardAuditActorRole.System, cascadedAuditEvent.ActorRole);
+        Assert.Null(cascadedAuditEvent.ActorID);
+    }
+
+    [Fact]
+    public async Task ManualGrant_DependentAwardWithoutGraphPrerequisite_ReturnsConflict()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.TeacherId);
+
+        var grant = await client.PostAsJsonAsync(
+            $"{AchievementsUrl(StudentApiFactory.CourseId)}/{StudentApiFactory.LockedAchievementId}/awards",
+            new ManualAchievementAwardRequest(StudentApiFactory.CourseZeroAchievementStudentId),
+            JsonOptions);
+
+        Assert.Equal(HttpStatusCode.Conflict, grant.StatusCode);
+        var error = await grant.Content.ReadFromJsonAsync<ApiErrorDto>(JsonOptions);
+        Assert.Equal("achievement_prerequisite_missing", error!.Code);
+
+        using var verificationScope = factory.Services.CreateScope();
+        var verificationDb = verificationScope.ServiceProvider
+            .GetRequiredService<AchievementDbContext>();
+        Assert.False(await verificationDb.StudentAchievements.AnyAsync(item =>
+            item.StudentID == StudentApiFactory.CourseZeroAchievementStudentId &&
+            item.AchievementID == StudentApiFactory.LockedAchievementId));
+        var auditEvent = Assert.Single(await verificationDb.AchievementAwardAuditEvents
+            .Where(item =>
+                item.StudentID == StudentApiFactory.CourseZeroAchievementStudentId &&
+                item.AchievementID == StudentApiFactory.LockedAchievementId)
+            .ToListAsync());
+        AssertRejectedGrantAudit(
+            auditEvent,
+            AchievementAwardAuditReason.ManualGrantPrerequisiteMissing);
+    }
+
+    [Fact]
+    public async Task ManualGrant_IgnoresCrossCourseGraphPrerequisite()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.TeacherId);
+
+        var sourceId = Guid.Parse("00000000-0000-0000-0000-000000000201");
+        var targetId = Guid.Parse("00000000-0000-0000-0000-000000000202");
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AchievementDbContext>();
+            var foreignSource = new AchievementEntity
+            {
+                Id = sourceId,
+                Title = "Чужой предшественник",
+                Description = "Связь не принадлежит текущему графу",
+                CourseID = StudentApiFactory.OtherCourseId,
+                Year = 2026
+            };
+            var localTarget = new AchievementEntity
+            {
+                Id = targetId,
+                Title = "Локальная ручная выдача",
+                Description = "Достижение текущего курса",
+                CourseID = StudentApiFactory.CourseId,
+                Year = 2026
+            };
+            db.Achievements.AddRange(foreignSource, localTarget);
+            db.AchievementConnections.Add(new AchievementConnectionEntity
+            {
+                Id = Guid.NewGuid(),
+                SourceId = sourceId,
+                Source = foreignSource,
+                TargetId = targetId,
+                Target = localTarget
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var grant = await client.PostAsJsonAsync(
+            $"{AchievementsUrl(StudentApiFactory.CourseId)}/{targetId}/awards",
+            new ManualAchievementAwardRequest(StudentApiFactory.CourseZeroAchievementStudentId),
+            JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, grant.StatusCode);
+        using var verificationScope = factory.Services.CreateScope();
+        var verificationDb = verificationScope.ServiceProvider
+            .GetRequiredService<AchievementDbContext>();
+        Assert.True(await verificationDb.StudentAchievements.AnyAsync(item =>
+            item.StudentID == StudentApiFactory.CourseZeroAchievementStudentId &&
+            item.AchievementID == targetId));
+    }
+
+    [Fact]
+    public async Task ManualGrant_AlreadyAwardedAchievement_ReturnsConflict()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.TeacherId);
+
+        var grant = await client.PostAsJsonAsync(
+            $"{AchievementsUrl(StudentApiFactory.CourseId)}/{StudentApiFactory.EarnedAchievementId}/awards",
+            new ManualAchievementAwardRequest(StudentApiFactory.StudentId),
+            JsonOptions);
+
+        Assert.Equal(HttpStatusCode.Conflict, grant.StatusCode);
+        var error = await grant.Content.ReadFromJsonAsync<ApiErrorDto>(JsonOptions);
+        Assert.Equal("achievement_award_already_exists", error!.Code);
+
+        using var verificationScope = factory.Services.CreateScope();
+        var verificationDb = verificationScope.ServiceProvider
+            .GetRequiredService<AchievementDbContext>();
+        var auditEvent = Assert.Single(await verificationDb.AchievementAwardAuditEvents
+            .Where(item =>
+                item.StudentID == StudentApiFactory.StudentId &&
+                item.AchievementID == StudentApiFactory.EarnedAchievementId)
+            .ToListAsync());
+        AssertRejectedGrantAudit(
+            auditEvent,
+            AchievementAwardAuditReason.ManualGrantAlreadyExists);
+    }
+
+    [Fact]
+    public async Task ManualGrant_StudentOutsideCourse_ReturnsConflict()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.TeacherId);
+
+        var grant = await client.PostAsJsonAsync(
+            $"{AchievementsUrl(StudentApiFactory.CourseId)}/{StudentApiFactory.EarnedAchievementId}/awards",
+            new ManualAchievementAwardRequest(StudentApiFactory.OtherStudentId),
+            JsonOptions);
+
+        Assert.Equal(HttpStatusCode.Conflict, grant.StatusCode);
+        var error = await grant.Content.ReadFromJsonAsync<ApiErrorDto>(JsonOptions);
+        Assert.Equal("student_course_enrollment_required", error!.Code);
+
+        using var verificationScope = factory.Services.CreateScope();
+        var verificationDb = verificationScope.ServiceProvider
+            .GetRequiredService<AchievementDbContext>();
+        var auditEvent = Assert.Single(await verificationDb.AchievementAwardAuditEvents
+            .Where(item =>
+                item.StudentID == StudentApiFactory.OtherStudentId &&
+                item.AchievementID == StudentApiFactory.EarnedAchievementId)
+            .ToListAsync());
+        AssertRejectedGrantAudit(
+            auditEvent,
+            AchievementAwardAuditReason.ManualGrantEnrollmentMissing);
+    }
+
+    [Fact]
+    public async Task ManualGrant_MissingStudent_ReturnsNotFoundAndAuditsRejection()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.TeacherId);
+
+        var missingStudentId = Guid.Parse("b0000000-0000-0000-0000-000000000999");
+        var grant = await client.PostAsJsonAsync(
+            $"{AchievementsUrl(StudentApiFactory.CourseId)}/{StudentApiFactory.EarnedAchievementId}/awards",
+            new ManualAchievementAwardRequest(missingStudentId),
+            JsonOptions);
+
+        Assert.Equal(HttpStatusCode.NotFound, grant.StatusCode);
+        var error = await grant.Content.ReadFromJsonAsync<ApiErrorDto>(JsonOptions);
+        Assert.Equal("student_not_found", error!.Code);
+
+        using var verificationScope = factory.Services.CreateScope();
+        var verificationDb = verificationScope.ServiceProvider
+            .GetRequiredService<AchievementDbContext>();
+        var auditEvent = Assert.Single(await verificationDb.AchievementAwardAuditEvents
+            .Where(item =>
+                item.StudentID == missingStudentId &&
+                item.AchievementID == StudentApiFactory.EarnedAchievementId)
+            .ToListAsync());
+        AssertRejectedGrantAudit(
+            auditEvent,
+            AchievementAwardAuditReason.ManualGrantStudentNotFound);
+    }
+
+    [Fact]
+    public async Task ManualRevoke_PrerequisiteRevokesUnsupportedDependentAwards()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.TeacherId);
+
+        var grantDependent = await client.PostAsJsonAsync(
+            $"{AchievementsUrl(StudentApiFactory.CourseId)}/{StudentApiFactory.LockedAchievementId}/awards",
+            new ManualAchievementAwardRequest(StudentApiFactory.StudentId),
+            JsonOptions);
+        var revokePrerequisite = await client.DeleteAsync(
+            $"{AchievementsUrl(StudentApiFactory.CourseId)}/{StudentApiFactory.EarnedAchievementId}/awards/{StudentApiFactory.StudentId}");
+
+        Assert.Equal(HttpStatusCode.OK, grantDependent.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, revokePrerequisite.StatusCode);
+
+        using var verificationScope = factory.Services.CreateScope();
+        var verificationDb = verificationScope.ServiceProvider
+            .GetRequiredService<AchievementDbContext>();
+        Assert.False(await verificationDb.StudentAchievements.AnyAsync(item =>
+            item.StudentID == StudentApiFactory.StudentId &&
+            item.AchievementID == StudentApiFactory.EarnedAchievementId));
+        Assert.False(await verificationDb.StudentAchievements.AnyAsync(item =>
+            item.StudentID == StudentApiFactory.StudentId &&
+            item.AchievementID == StudentApiFactory.LockedAchievementId));
+
+        var prerequisiteAuditEvent = Assert.Single(await verificationDb.AchievementAwardAuditEvents
+            .Where(item =>
+                item.StudentID == StudentApiFactory.StudentId &&
+                item.AchievementID == StudentApiFactory.EarnedAchievementId)
+            .ToListAsync());
+        Assert.Equal(AchievementAwardAuditEventType.Revoked, prerequisiteAuditEvent.EventType);
+        Assert.Equal(AchievementAwardAuditReason.ManualRevocation, prerequisiteAuditEvent.Reason);
+
+        var dependentAuditEvents = await verificationDb.AchievementAwardAuditEvents
+            .Where(item =>
+                item.StudentID == StudentApiFactory.StudentId &&
+                item.AchievementID == StudentApiFactory.LockedAchievementId)
+            .ToListAsync();
+        Assert.Contains(dependentAuditEvents, item =>
+            item.EventType == AchievementAwardAuditEventType.Granted &&
+            item.Reason == AchievementAwardAuditReason.ManualGrant);
+        Assert.Contains(dependentAuditEvents, item =>
+            item.EventType == AchievementAwardAuditEventType.Revoked &&
+            item.Reason == AchievementAwardAuditReason.PrerequisiteRevocation);
+    }
+
+    [Fact]
+    public async Task ManualRevoke_KeepsDependentAwardWhenAnotherPrerequisiteIsEarned()
+    {
+        using var client = CreateClient();
+        await Login(client, StudentApiFactory.TeacherId);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AchievementDbContext>();
+            var bonus = await db.Achievements.SingleAsync(
+                item => item.Id == StudentApiFactory.BonusAchievementId);
+            var locked = await db.Achievements.SingleAsync(
+                item => item.Id == StudentApiFactory.LockedAchievementId);
+            db.StudentAchievements.Add(new StudentAchievementEntity
+            {
+                Id = Guid.NewGuid(),
+                StudentID = StudentApiFactory.StudentId,
+                AchievementID = StudentApiFactory.BonusAchievementId,
+                Achievement = bonus,
+                AchievementGotDate = DateTime.UtcNow,
+                AchievementFoundDate = DateTime.UtcNow
+            });
+            db.AchievementConnections.Add(new AchievementConnectionEntity
+            {
+                Id = Guid.NewGuid(),
+                SourceId = StudentApiFactory.BonusAchievementId,
+                Source = bonus,
+                TargetId = StudentApiFactory.LockedAchievementId,
+                Target = locked
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var grantDependent = await client.PostAsJsonAsync(
+            $"{AchievementsUrl(StudentApiFactory.CourseId)}/{StudentApiFactory.LockedAchievementId}/awards",
+            new ManualAchievementAwardRequest(StudentApiFactory.StudentId),
+            JsonOptions);
+        var revokeOnePrerequisite = await client.DeleteAsync(
+            $"{AchievementsUrl(StudentApiFactory.CourseId)}/{StudentApiFactory.EarnedAchievementId}/awards/{StudentApiFactory.StudentId}");
+
+        Assert.Equal(HttpStatusCode.OK, grantDependent.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, revokeOnePrerequisite.StatusCode);
+
+        using var verificationScope = factory.Services.CreateScope();
+        var verificationDb = verificationScope.ServiceProvider
+            .GetRequiredService<AchievementDbContext>();
+        Assert.True(await verificationDb.StudentAchievements.AnyAsync(item =>
+            item.StudentID == StudentApiFactory.StudentId &&
+            item.AchievementID == StudentApiFactory.LockedAchievementId));
+        Assert.True(await verificationDb.StudentAchievements.AnyAsync(item =>
+            item.StudentID == StudentApiFactory.StudentId &&
+            item.AchievementID == StudentApiFactory.BonusAchievementId));
+        Assert.False(await verificationDb.StudentAchievements.AnyAsync(item =>
+            item.StudentID == StudentApiFactory.StudentId &&
+            item.AchievementID == StudentApiFactory.EarnedAchievementId));
+
+        var dependentAuditEvents = await verificationDb.AchievementAwardAuditEvents
+            .Where(item =>
+                item.StudentID == StudentApiFactory.StudentId &&
+                item.AchievementID == StudentApiFactory.LockedAchievementId)
+            .ToListAsync();
+        Assert.DoesNotContain(dependentAuditEvents, item =>
+            item.EventType == AchievementAwardAuditEventType.Revoked &&
+            item.Reason == AchievementAwardAuditReason.PrerequisiteRevocation);
+    }
+
+    [Fact]
     public async Task AchievementWithDependency_CannotBeDeletedUntilGraphIsChanged()
     {
         using var client = CreateClient();
@@ -234,5 +599,17 @@ public sealed class AchievementManagementApiTests(StudentApiFactory factory)
         var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
         options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
         return options;
+    }
+
+    private static void AssertRejectedGrantAudit(
+        AchievementAwardAuditEventEntity auditEvent,
+        AchievementAwardAuditReason reason)
+    {
+        Assert.Equal(AchievementAwardAuditEventType.Rejected, auditEvent.EventType);
+        Assert.Equal(reason, auditEvent.Reason);
+        Assert.Null(auditEvent.AwardID);
+        Assert.Null(auditEvent.AwardedAt);
+        Assert.NotNull(auditEvent.ActorID);
+        Assert.NotEqual(AchievementAwardAuditActorRole.System, auditEvent.ActorRole);
     }
 }

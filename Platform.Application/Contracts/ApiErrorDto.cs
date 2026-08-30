@@ -48,6 +48,21 @@ public static class ApiErrors
     public static readonly ApiErrorDto AchievementAwardNotFound =
         new("achievement_award_not_found", "У указанного студента нет этой ачивки.");
 
+    public static readonly ApiErrorDto StudentNotFound =
+        new("student_not_found", "Студент с таким ID не найден.");
+
+    public static readonly ApiErrorDto InvalidStudentId =
+        new("invalid_student_id", "Укажите корректный ID студента в формате GUID.");
+
+    public static readonly ApiErrorDto StudentCourseEnrollmentRequired =
+        new("student_course_enrollment_required", "Студент не обучается на этом курсе в указанном году.");
+
+    public static readonly ApiErrorDto AchievementAwardAlreadyExists =
+        new("achievement_award_already_exists", "У указанного студента уже есть эта ачивка.");
+
+    public static readonly ApiErrorDto AchievementPrerequisiteMissing =
+        new("achievement_prerequisite_missing", "Студент должен получить одно из предыдущих достижений графа перед выдачей этой ачивки.");
+
     public static readonly ApiErrorDto InvalidAchievement =
         new("invalid_achievement", "Проверьте название, описание и трек достижения.");
 

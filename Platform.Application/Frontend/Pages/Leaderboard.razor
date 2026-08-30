@@ -1,0 +1,231 @@
+@page "/leaderboard"
+@attribute [Authorize(Roles = "student")]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IStudentCourseService StudentCourseService
+@inject IStudentLeaderboardService LeaderboardService
+
+<PageTitle>Таблица лидеров — Платформа достижений</PageTitle>
+
+<h1 class="leaderboard-title">Таблица лидеров</h1>
+
+@if (_isLoading)
+{
+    <div class="d-flex align-items-center gap-2 mt-3">
+        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+        <span class="text-muted">Загрузка...</span>
+    </div>
+}
+else if (_pageError != null)
+{
+    <div class="alert alert-danger mt-3">
+        @_pageError
+        <button class="btn btn-outline-danger btn-sm ms-2" @onclick="LoadPageAsync">Повторить</button>
+    </div>
+}
+else if (!_isAuthenticated)
+{
+    <div class="alert alert-warning mt-3">
+        <span class="oi oi-warning me-2" aria-hidden="true"></span>
+        Необходимо <a href="login">войти в систему</a>, чтобы просматривать таблицу лидеров.
+    </div>
+}
+else if (_courses == null || _courses.Count == 0)
+{
+    <div class="alert alert-info mt-3">Курсы не найдены. Обратитесь к администратору.</div>
+}
+else
+{
+    <div class="mb-3 leaderboard-course-select">
+        <label for="leaderboardCourseSelect" class="form-label">Дисциплина</label>
+        <select
+            id="leaderboardCourseSelect"
+            class="form-select"
+            value="@SelectedCourseValue"
+            @onchange="OnCourseChangedAsync">
+            @foreach (var course in _courses)
+            {
+                <option value="@CourseValue(course)">@course.Title (@course.Year)</option>
+            }
+        </select>
+    </div>
+
+    @if (_leaderboardLoading)
+    {
+        <div class="d-flex align-items-center gap-2 mt-3">
+            <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+            <span class="text-muted">Загрузка таблицы...</span>
+        </div>
+    }
+    else if (_leaderboardError != null)
+    {
+        <div class="alert alert-danger mt-3">
+            @_leaderboardError
+            <button class="btn btn-outline-danger btn-sm ms-2" @onclick="LoadLeaderboardAsync">Повторить</button>
+        </div>
+    }
+    else if (_entries == null || _entries.Count == 0)
+    {
+        <div class="alert alert-info mt-3">В этом потоке пока нет студентов.</div>
+    }
+    else
+    {
+        <div class="table-responsive leaderboard-table-wrap">
+            <table class="table table-hover align-middle leaderboard-table">
+                <thead>
+                    <tr>
+                        <th scope="col">Студент</th>
+                        <th scope="col">Достижения</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var entry in _entries)
+                    {
+                        <tr class="@CurrentStudentRowClass(entry)">
+                            <td>
+                                <div class="leaderboard-student-name">@entry.StudentName</div>
+                                @if (!string.IsNullOrWhiteSpace(entry.Group))
+                                {
+                                    <div class="leaderboard-student-group">@entry.Group</div>
+                                }
+                            </td>
+                            <td>
+                                <span class="leaderboard-count">@entry.AchievementCount</span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+@code {
+    private bool _isLoading = true;
+    private bool _isAuthenticated;
+    private IReadOnlyList<CourseDto>? _courses;
+    private IReadOnlyList<LeaderboardEntryDto>? _entries;
+    private Guid _currentStudentId;
+    private Guid _selectedCourseId;
+    private int _selectedYear;
+    private bool _leaderboardLoading;
+    private string? _pageError;
+    private string? _leaderboardError;
+
+    private string SelectedCourseValue =>
+        _selectedCourseId == Guid.Empty ? string.Empty : $"{_selectedCourseId}:{_selectedYear}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPageAsync();
+    }
+
+    private async Task LoadPageAsync()
+    {
+        _isLoading = true;
+        _pageError = null;
+        _leaderboardError = null;
+
+        try
+        {
+            var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            if (!authenticationState.User.TryGetUserId(out _currentStudentId))
+            {
+                _isAuthenticated = false;
+                return;
+            }
+
+            _isAuthenticated = true;
+            _courses = await StudentCourseService.GetCoursesAsync(_currentStudentId);
+            if (_courses.Count > 0)
+            {
+                _selectedCourseId = _courses[0].Id;
+                _selectedYear = _courses[0].Year;
+            }
+        }
+        catch
+        {
+            _pageError = "Не удалось загрузить список дисциплин.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+
+        if (_isAuthenticated && _pageError == null && _selectedCourseId != Guid.Empty)
+            await LoadLeaderboardAsync();
+    }
+
+    private async Task OnCourseChangedAsync(ChangeEventArgs e)
+    {
+        if (!TryParseCourseValue(e.Value?.ToString(), out var courseId, out var year))
+            return;
+
+        _selectedCourseId = courseId;
+        _selectedYear = year;
+        await LoadLeaderboardAsync();
+    }
+
+    private async Task LoadLeaderboardAsync()
+    {
+        if (_selectedCourseId == Guid.Empty)
+            return;
+
+        _leaderboardLoading = true;
+        _leaderboardError = null;
+
+        try
+        {
+            var result = await LeaderboardService.GetLeaderboardAsync(
+                _currentStudentId,
+                _selectedCourseId,
+                _selectedYear);
+
+            if (result.Status == StudentLeaderboardQueryStatus.Success)
+            {
+                _entries = result.Entries ?? [];
+            }
+            else
+            {
+                _entries = [];
+                _leaderboardError = result.Status switch
+                {
+                    StudentLeaderboardQueryStatus.CourseNotFound =>
+                        "Дисциплина за выбранный год не найдена.",
+                    StudentLeaderboardQueryStatus.AccessDenied =>
+                        "Нет доступа к выбранной дисциплине.",
+                    _ => "Не удалось загрузить таблицу лидеров."
+                };
+            }
+        }
+        catch
+        {
+            _entries = [];
+            _leaderboardError = "Не удалось загрузить таблицу лидеров.";
+        }
+        finally
+        {
+            _leaderboardLoading = false;
+        }
+    }
+
+    private string CurrentStudentRowClass(LeaderboardEntryDto entry) =>
+        entry.StudentId == _currentStudentId ? "table-primary leaderboard-current-student" : string.Empty;
+
+    private static string CourseValue(CourseDto course) => $"{course.Id}:{course.Year}";
+
+    private static bool TryParseCourseValue(
+        string? value,
+        out Guid courseId,
+        out int year)
+    {
+        courseId = Guid.Empty;
+        year = 0;
+
+        var colon = value?.IndexOf(':') ?? -1;
+        if (colon <= 0)
+            return false;
+
+        return Guid.TryParse(value![..colon], out courseId) &&
+            int.TryParse(value[(colon + 1)..], out year);
+    }
+}

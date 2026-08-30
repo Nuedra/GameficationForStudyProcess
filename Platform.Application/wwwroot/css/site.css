@@ -127,6 +127,190 @@ a, .btn-link {
     overflow: auto;
 }
 
+/* Leaderboard page */
+.leaderboard-title {
+    max-width: 520px;
+    margin-left: auto;
+    margin-right: auto;
+    text-align: center;
+}
+
+.leaderboard-course-select {
+    max-width: 640px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.leaderboard-course-select .form-label {
+    display: block;
+    text-align: center;
+}
+
+.leaderboard-table-wrap {
+    max-width: 520px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.leaderboard-table {
+    border: 1px solid #dee2e6;
+}
+
+.leaderboard-table th,
+.leaderboard-table td {
+    text-align: center;
+}
+
+.leaderboard-table th:last-child,
+.leaderboard-table td:last-child {
+    width: 8rem;
+    white-space: nowrap;
+}
+
+.leaderboard-table thead th {
+    background: #f8f9fa;
+    font-weight: 600;
+}
+
+.leaderboard-student-name {
+    font-weight: 600;
+}
+
+.leaderboard-student-group {
+    color: #6c757d;
+    font-size: 0.875rem;
+}
+
+.leaderboard-count {
+    display: inline-flex;
+    min-width: 2.25rem;
+    justify-content: center;
+    border-radius: 999px;
+    background: #eef4ff;
+    color: #174ea6;
+    font-weight: 700;
+    padding: 0.2rem 0.65rem;
+}
+
+.leaderboard-current-student .leaderboard-count {
+    background: #1b6ec2;
+    color: #fff;
+}
+
+/* Student statistics page */
+.statistics-content {
+    width: 100%;
+    min-width: 0;
+    max-width: 760px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.statistics-title {
+    text-align: center;
+}
+
+.statistics-course-select {
+    width: 100%;
+    min-width: 0;
+    max-width: 640px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.statistics-course-select .form-select {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.statistics-course-select .form-label {
+    display: block;
+    text-align: center;
+}
+
+.statistics-results {
+    min-height: 9rem;
+}
+
+.statistics-total {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    min-height: 7rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #dee2e6;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.statistics-total-icon {
+    color: #1b6ec2;
+    font-size: 2rem;
+}
+
+.statistics-total-label {
+    color: #6c757d;
+    font-size: 0.95rem;
+}
+
+.statistics-total-value {
+    font-size: 2.25rem;
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.statistics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.statistics-item {
+    min-width: 0;
+    padding: 1rem;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    background: #fff;
+    text-align: center;
+}
+
+.statistics-swatch {
+    display: block;
+    width: 1.1rem;
+    height: 1.1rem;
+    margin: 0 auto 0.65rem;
+    border-radius: 50%;
+    background: var(--statistics-color);
+}
+
+.statistics-item-label {
+    min-height: 2.5rem;
+    color: #495057;
+    font-size: 0.9rem;
+    overflow-wrap: anywhere;
+}
+
+.statistics-item-value {
+    color: var(--statistics-color);
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.statistics-common { --statistics-color: #667085; }
+.statistics-rare { --statistics-color: #2563eb; }
+.statistics-epic { --statistics-color: #9333ea; }
+.statistics-legendary { --statistics-color: #c97800; }
+
+@media (max-width: 767.98px) {
+    .statistics-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
 /* ── Blazor errors ── */
 #blazor-error-ui {
     background: lightyellow;

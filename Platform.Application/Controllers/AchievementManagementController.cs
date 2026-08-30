@@ -157,6 +157,33 @@ public sealed class AchievementManagementController(
             : ToErrorResult(result.Status);
     }
 
+    [HttpPost("{achievementId:guid}/awards")]
+    [ProducesResponseType(typeof(ManagedAchievementDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<ManagedAchievementDto>> GrantAward(
+        Guid courseId,
+        int year,
+        Guid achievementId,
+        [FromBody] ManualAchievementAwardRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetIdentity(out var userId, out var roleResult))
+            return Unauthorized(ApiErrors.AuthenticationRequired);
+        if (request.StudentId == Guid.Empty)
+            return BadRequest(ApiErrors.InvalidStudentId);
+
+        var result = await achievementManagementService.GrantAwardAsync(
+            userId,
+            roleResult,
+            courseId,
+            year,
+            achievementId,
+            request.StudentId,
+            cancellationToken);
+        return result.Status == AchievementManagementStatus.Success
+            ? Ok(result.Achievement)
+            : ToErrorResult(result.Status);
+    }
+
     [HttpDelete("{achievementId:guid}/awards/{studentId:guid}")]
     [ProducesResponseType(typeof(ManagedAchievementDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<ManagedAchievementDto>> RevokeAward(
@@ -252,12 +279,20 @@ public sealed class AchievementManagementController(
                 NotFound(ApiErrors.AchievementCriteriaNotFound),
             AchievementManagementStatus.AwardNotFound =>
                 NotFound(ApiErrors.AchievementAwardNotFound),
+            AchievementManagementStatus.StudentNotFound =>
+                NotFound(ApiErrors.StudentNotFound),
             AchievementManagementStatus.InvalidAchievement =>
                 BadRequest(ApiErrors.InvalidAchievement),
             AchievementManagementStatus.InvalidCriteria =>
                 BadRequest(ApiErrors.InvalidAchievementCriteria),
             AchievementManagementStatus.DuplicateTitle => Conflict(
                 ApiErrors.DuplicateAchievementTitle),
+            AchievementManagementStatus.StudentCourseEnrollmentRequired => Conflict(
+                ApiErrors.StudentCourseEnrollmentRequired),
+            AchievementManagementStatus.AwardAlreadyExists => Conflict(
+                ApiErrors.AchievementAwardAlreadyExists),
+            AchievementManagementStatus.AchievementPrerequisiteMissing => Conflict(
+                ApiErrors.AchievementPrerequisiteMissing),
             AchievementManagementStatus.AwardsConfirmationRequired => Conflict(
                 ApiErrors.AchievementAwardsConfirmationRequired),
             AchievementManagementStatus.HasDependencies => Conflict(

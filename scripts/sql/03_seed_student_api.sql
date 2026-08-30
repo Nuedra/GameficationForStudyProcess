@@ -23,6 +23,8 @@ FROM (
     SELECT generate_series(1, 50) AS number
     UNION ALL
     SELECT generate_series(52, 55) AS number
+    UNION ALL
+    SELECT generate_series(101, 107) AS number
 ) AS template_ids;
 
 DELETE FROM "achievement_award_audit_events"
@@ -59,6 +61,14 @@ VALUES
     'Кафедра информатики',
     'c1000000-0000-0000-0000-000000000002',
     NULL
+),
+(
+    'a1000000-0000-0000-0000-000000000003',
+    'Дискретная математика',
+    'Дополнительная демонстрационная дисциплина для проверки нескольких курсов у студента',
+    'Кафедра информатики',
+    'c1000000-0000-0000-0000-000000000003',
+    NULL
 )
 ON CONFLICT ("Id") DO UPDATE SET
     "Title" = EXCLUDED."Title",
@@ -77,6 +87,11 @@ VALUES
     'a1000000-0000-0000-0000-000000000002',
     2026,
     'c2000000-0000-0000-0000-000000000002'
+),
+(
+    'a1000000-0000-0000-0000-000000000003',
+    2026,
+    'c2000000-0000-0000-0000-000000000003'
 )
 ON CONFLICT ("CourseID", "Year") DO UPDATE SET
     "ContentScopeID" = EXCLUDED."ContentScopeID";
@@ -134,8 +149,8 @@ SELECT
     ('b0000000-0000-0000-0000-' || lpad(number::text, 12, '0'))::uuid,
     'Студент' || number,
     'Тестовый',
-    CASE WHEN number <= 10 THEN 'ИВТ-101' ELSE 'ИВТ-102' END
-FROM generate_series(1, 20) AS number
+    CASE WHEN number <= 10 OR number >= 21 THEN 'ИВТ-101' ELSE 'ИВТ-102' END
+FROM generate_series(1, 22) AS number
 ON CONFLICT ("Id") DO UPDATE SET
     "Name" = EXCLUDED."Name",
     "Surname" = EXCLUDED."Surname",
@@ -144,10 +159,10 @@ ON CONFLICT ("Id") DO UPDATE SET
 INSERT INTO "group_students" ("PersonID", "EdGroupID", "StartDate", "EndDate")
 SELECT
     ('b0000000-0000-0000-0000-' || lpad(number::text, 12, '0'))::uuid,
-    CASE WHEN number <= 10 THEN 'ИВТ-101' ELSE 'ИВТ-102' END,
+    CASE WHEN number <= 10 OR number >= 21 THEN 'ИВТ-101' ELSE 'ИВТ-102' END,
     TIMESTAMPTZ '2025-09-01T00:00:00Z',
     NULL
-FROM generate_series(1, 20) AS number
+FROM generate_series(1, 22) AS number
 ON CONFLICT ("PersonID", "EdGroupID", "StartDate") DO UPDATE SET
     "EndDate" = EXCLUDED."EndDate";
 
@@ -184,6 +199,22 @@ SELECT
 FROM (
     SELECT generate_series(13, 20) AS number
 ) AS enrolled
+ON CONFLICT ("CourseID", "Year", "PersonID") DO UPDATE SET
+    "StartDate" = EXCLUDED."StartDate",
+    "EndDate" = EXCLUDED."EndDate";
+
+-- Student 1 has two disciplines; students 21-22 make the second leaderboard visible.
+INSERT INTO "course_instance_students"
+    ("CourseID", "Year", "PersonID", "StartDate", "EndDate")
+SELECT
+    'a1000000-0000-0000-0000-000000000003',
+    2026,
+    ('b0000000-0000-0000-0000-' || lpad(number::text, 12, '0'))::uuid,
+    TIMESTAMPTZ '2026-02-01T00:00:00Z',
+    NULL
+FROM (
+    VALUES (1), (21), (22)
+) AS enrolled(number)
 ON CONFLICT ("CourseID", "Year", "PersonID") DO UPDATE SET
     "StartDate" = EXCLUDED."StartDate",
     "EndDate" = EXCLUDED."EndDate";
@@ -271,6 +302,44 @@ ON CONFLICT ("Id") DO UPDATE SET
     "LabID" = EXCLUDED."LabID",
     "CourseID" = EXCLUDED."CourseID";
 
+CREATE TEMP TABLE seed_additional_course_achievements (
+    "AchievementNumber" integer PRIMARY KEY,
+    "TemplateNumber" integer NOT NULL,
+    "Title" text NOT NULL
+) ON COMMIT DROP;
+
+INSERT INTO seed_additional_course_achievements
+    ("AchievementNumber", "TemplateNumber", "Title")
+VALUES
+    (101, 1, 'Подмастерье'),
+    (102, 2, 'Первый коммит'),
+    (103, 3, 'Полпути пройдено!'),
+    (104, 4, 'Лабораторный ветеран'),
+    (105, 5, 'Первое появление'),
+    (106, 6, 'Уверенный слушатель'),
+    (107, 7, 'Образцовый студент');
+
+INSERT INTO "achievements"
+    ("Id", "Title", "Description", "Year", "Rarity", "Track", "LabID", "CourseID")
+SELECT
+    ('00000000-0000-0000-0000-' || lpad("AchievementNumber"::text, 12, '0'))::uuid,
+    "Title",
+    'Демо-ачивка дополнительной дисциплины, привязанная к XML-шаблону графа',
+    2026,
+    'common',
+    'achievement-graph-template',
+    NULL,
+    'a1000000-0000-0000-0000-000000000003'::uuid
+FROM seed_additional_course_achievements
+ON CONFLICT ("Id") DO UPDATE SET
+    "Title" = EXCLUDED."Title",
+    "Description" = EXCLUDED."Description",
+    "Year" = EXCLUDED."Year",
+    "Rarity" = EXCLUDED."Rarity",
+    "Track" = EXCLUDED."Track",
+    "LabID" = EXCLUDED."LabID",
+    "CourseID" = EXCLUDED."CourseID";
+
 INSERT INTO "achievement_criterias" ("Id", "IsEnabled", "Expression", "AchievementID")
 SELECT
     ('f0000000-0000-0000-0000-' || lpad("Number"::text, 12, '0'))::uuid,
@@ -278,6 +347,17 @@ SELECT
     'template_achievement_' || "Number",
     ('00000000-0000-0000-0000-' || lpad("Number"::text, 12, '0'))::uuid
 FROM seed_template_achievements
+ON CONFLICT ("AchievementID") DO UPDATE SET
+    "IsEnabled" = EXCLUDED."IsEnabled",
+    "Expression" = EXCLUDED."Expression";
+
+INSERT INTO "achievement_criterias" ("Id", "IsEnabled", "Expression", "AchievementID")
+SELECT
+    ('f1000000-0000-0000-0000-' || lpad("AchievementNumber"::text, 12, '0'))::uuid,
+    TRUE,
+    'template_achievement_' || "TemplateNumber",
+    ('00000000-0000-0000-0000-' || lpad("AchievementNumber"::text, 12, '0'))::uuid
+FROM seed_additional_course_achievements
 ON CONFLICT ("AchievementID") DO UPDATE SET
     "IsEnabled" = EXCLUDED."IsEnabled",
     "Expression" = EXCLUDED."Expression";
@@ -363,6 +443,30 @@ FROM seed_template_edges
 ON CONFLICT ("SourceId", "TargetId") DO UPDATE SET
     "Id" = EXCLUDED."Id";
 
+CREATE TEMP TABLE seed_additional_course_edges (
+    "Ordinal" integer PRIMARY KEY,
+    "SourceNumber" integer NOT NULL,
+    "TargetNumber" integer NOT NULL
+) ON COMMIT DROP;
+
+INSERT INTO seed_additional_course_edges ("Ordinal", "SourceNumber", "TargetNumber")
+VALUES
+    (1, 101, 102),
+    (2, 102, 103),
+    (3, 103, 104),
+    (4, 101, 105),
+    (5, 105, 106),
+    (6, 106, 107);
+
+INSERT INTO "achievement_connections" ("Id", "SourceId", "TargetId")
+SELECT
+    ('93000000-0000-0000-0000-' || lpad("Ordinal"::text, 12, '0'))::uuid,
+    ('00000000-0000-0000-0000-' || lpad("SourceNumber"::text, 12, '0'))::uuid,
+    ('00000000-0000-0000-0000-' || lpad("TargetNumber"::text, 12, '0'))::uuid
+FROM seed_additional_course_edges
+ON CONFLICT ("SourceId", "TargetId") DO UPDATE SET
+    "Id" = EXCLUDED."Id";
+
 INSERT INTO "student_achievements"
     ("Id", "AchievementGotDate", "AchievementFoundDate", "IsNotificationSeen",
      "IsFirstAnimationShown", "LabID", "AchievementID", "StudentID")
@@ -396,6 +500,96 @@ VALUES
     NULL,
     '00000000-0000-0000-0000-000000000001',
     'b0000000-0000-0000-0000-000000000002'
+),
+(
+    '91000000-0000-0000-0000-000000000101',
+    TIMESTAMPTZ '2026-03-10T10:00:00Z',
+    TIMESTAMPTZ '2026-03-10T10:05:00Z',
+    TRUE,
+    TRUE,
+    NULL,
+    '00000000-0000-0000-0000-000000000101',
+    'b0000000-0000-0000-0000-000000000001'
+),
+(
+    '91000000-0000-0000-0000-000000000102',
+    TIMESTAMPTZ '2026-03-12T10:00:00Z',
+    TIMESTAMPTZ '2026-03-12T10:05:00Z',
+    FALSE,
+    FALSE,
+    NULL,
+    '00000000-0000-0000-0000-000000000102',
+    'b0000000-0000-0000-0000-000000000001'
+),
+(
+    '91000000-0000-0000-0000-000000000103',
+    TIMESTAMPTZ '2026-03-14T10:00:00Z',
+    TIMESTAMPTZ '2026-03-14T10:05:00Z',
+    FALSE,
+    FALSE,
+    NULL,
+    '00000000-0000-0000-0000-000000000105',
+    'b0000000-0000-0000-0000-000000000001'
+),
+(
+    '91000000-0000-0000-0000-000000000104',
+    TIMESTAMPTZ '2026-03-10T11:00:00Z',
+    TIMESTAMPTZ '2026-03-10T11:05:00Z',
+    TRUE,
+    TRUE,
+    NULL,
+    '00000000-0000-0000-0000-000000000101',
+    'b0000000-0000-0000-0000-000000000021'
+),
+(
+    '91000000-0000-0000-0000-000000000105',
+    TIMESTAMPTZ '2026-03-12T11:00:00Z',
+    TIMESTAMPTZ '2026-03-12T11:05:00Z',
+    TRUE,
+    TRUE,
+    NULL,
+    '00000000-0000-0000-0000-000000000102',
+    'b0000000-0000-0000-0000-000000000021'
+),
+(
+    '91000000-0000-0000-0000-000000000106',
+    TIMESTAMPTZ '2026-03-14T11:00:00Z',
+    TIMESTAMPTZ '2026-03-14T11:05:00Z',
+    FALSE,
+    FALSE,
+    NULL,
+    '00000000-0000-0000-0000-000000000103',
+    'b0000000-0000-0000-0000-000000000021'
+),
+(
+    '91000000-0000-0000-0000-000000000107',
+    TIMESTAMPTZ '2026-03-16T11:00:00Z',
+    TIMESTAMPTZ '2026-03-16T11:05:00Z',
+    FALSE,
+    FALSE,
+    NULL,
+    '00000000-0000-0000-0000-000000000105',
+    'b0000000-0000-0000-0000-000000000021'
+),
+(
+    '91000000-0000-0000-0000-000000000108',
+    TIMESTAMPTZ '2026-03-18T11:00:00Z',
+    TIMESTAMPTZ '2026-03-18T11:05:00Z',
+    FALSE,
+    FALSE,
+    NULL,
+    '00000000-0000-0000-0000-000000000106',
+    'b0000000-0000-0000-0000-000000000021'
+),
+(
+    '91000000-0000-0000-0000-000000000109',
+    TIMESTAMPTZ '2026-03-10T12:00:00Z',
+    TIMESTAMPTZ '2026-03-10T12:05:00Z',
+    FALSE,
+    FALSE,
+    NULL,
+    '00000000-0000-0000-0000-000000000101',
+    'b0000000-0000-0000-0000-000000000022'
 )
 ON CONFLICT ("StudentID", "AchievementID") DO UPDATE SET
     "AchievementGotDate" = EXCLUDED."AchievementGotDate",

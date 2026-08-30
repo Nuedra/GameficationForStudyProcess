@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 using Platform.Core.AchievementGraphs;
 using Platform.Core.Processing;
 using Platform.DataAccess.Postgress;
@@ -14,6 +15,8 @@ public sealed class StudentAchievementGraphService(
     IAchievementGraphXmlSerializer serializer,
     AchievementProcessingCycle achievementProcessingCycle) : IStudentAchievementGraphService
 {
+    private const string TemplateAchievementCriterionPrefix = "template_achievement_";
+
     public async Task<StudentAchievementGraphQueryResult> GetGraphXmlAsync(
         Guid studentId,
         Guid courseId,
@@ -129,10 +132,13 @@ public sealed class StudentAchievementGraphService(
             .Where(achievement =>
                 achievement.CourseID == courseId &&
                 achievement.Year == year)
-            .Select(achievement => achievement.Id)
+            .Select(achievement => new CourseAchievementGraphNode(
+                achievement.Id,
+                achievement.Criteria == null ? null : achievement.Criteria.Expression))
             .ToListAsync(cancellationToken);
 
         var achievementIds = achievements
+            .Select(achievement => achievement.AchievementId)
             .ToHashSet();
 
         var earnedIds = (await dbContext.StudentAchievements
@@ -162,9 +168,44 @@ public sealed class StudentAchievementGraphService(
 
         return achievements
             .Select(achievement => new AchievementGraphNodeState(
-                achievement,
-                ResolveStatus(achievement, earnedIds, dependenciesByTarget)))
+                ResolveTemplateAchievementId(achievement),
+                ResolveStatus(achievement.AchievementId, earnedIds, dependenciesByTarget)))
             .ToList();
+    }
+
+    private static Guid ResolveTemplateAchievementId(CourseAchievementGraphNode achievement)
+    {
+        if (TryParseTemplateAchievementNumber(achievement.CriteriaExpression, out var number))
+        {
+            return Guid.Parse(
+                "00000000-0000-0000-0000-" +
+                number.ToString("D12", CultureInfo.InvariantCulture));
+        }
+
+        return achievement.AchievementId;
+    }
+
+    private static bool TryParseTemplateAchievementNumber(
+        string? criteriaExpression,
+        out int number)
+    {
+        number = 0;
+
+        var normalized = criteriaExpression?.Trim();
+        if (string.IsNullOrWhiteSpace(normalized) ||
+            !normalized.StartsWith(
+                TemplateAchievementCriterionPrefix,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return int.TryParse(
+                normalized[TemplateAchievementCriterionPrefix.Length..],
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out number) &&
+            number > 0;
     }
 
     private static AchievementGraphStatus ResolveStatus(
@@ -210,4 +251,8 @@ public sealed class StudentAchievementGraphService(
         CourseNotFound,
         AccessDenied
     }
+
+    private sealed record CourseAchievementGraphNode(
+        Guid AchievementId,
+        string? CriteriaExpression);
 }

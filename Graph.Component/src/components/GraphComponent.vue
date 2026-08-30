@@ -226,6 +226,13 @@
                 this.graph?.resetViewport();
             },
 
+            fitGraphToCanvas(): void {
+                const canvas = this.graphCanvas;
+                if (!canvas || !this.graph) return;
+
+                this.graph.fitViewportToNodes(canvas.width, canvas.height);
+            },
+
             getGraphData(): { nodes: any[]; edges: any[] } {
                 const nodes = this.getNodes().map(node => this.nodeToData(node));
                 const edges = this.getEdges().map(edge => this.edgeToData(edge as Graph.Line));
@@ -302,8 +309,7 @@
                     this.createNodesFromXml(xmlDoc, customDescriptions);
                     this.createEdgesFromXml(xmlDoc);
 
-                    // Перерисовываем граф
-                    this.graph?.requestRedraw();
+                    this.fitGraphToCanvas();
 
                 } catch (error: unknown) {
                     console.error('Ошибка обновления графа:', error);
@@ -354,8 +360,7 @@
                     canvas.width = newWidth;
                     canvas.height = newHeight;
 
-                    // Перерисовываем граф
-                    this.graph.requestRedraw();
+                    this.fitGraphToCanvas();
                 }
             },
 
@@ -614,7 +619,7 @@
                 this.createNodesFromXml(xmlDoc, customDescriptions);
                 this.createEdgesFromXml(xmlDoc);
 
-                this.graph.requestRedraw();
+                this.fitGraphToCanvas();
                 this.setupEnhancedClickHandlers();
                 this.setupSelectionConstraints();
                 this.setupEventListeners();
@@ -802,13 +807,19 @@
                     const edgeStyle = node.getElementsByTagName("edgeStyle")[0];
                     const labelSettings = node.getElementsByTagName("labelSettings")[0];
                     const status = this.getStatusState(node);
+                    const isLocked = status === "locked";
 
                     const connectors = this.loadConnectorsForNode(xmlDoc, id);
 
                     const labelInfo = {
-                        text: label,
-                        color: (labelSettings && labelSettings.getAttribute("color")) || 'black',
-                        font: (labelSettings && labelSettings.getAttribute("font")) || '16px Arial',
+                        text: isLocked ? "" : label,
+                        icon: isLocked ? 'lock' as const : undefined,
+                        color: isLocked
+                            ? '#455a64'
+                            : (labelSettings && labelSettings.getAttribute("color")) || 'black',
+                        font: isLocked
+                            ? '28px Arial'
+                            : (labelSettings && labelSettings.getAttribute("font")) || '16px Arial',
                         padding: 10,
                     };
 
