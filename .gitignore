@@ -8,6 +8,8 @@
 
 # Local project documents, presentations, renders, and assistant settings
 /project-materials/
+/output/pdf/
+/tmp/pdfs/
 /.claude/
 
 # User-specific files
