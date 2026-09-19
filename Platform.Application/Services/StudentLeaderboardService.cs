@@ -59,37 +59,64 @@ public sealed class StudentLeaderboardService(
             .ToListAsync(cancellationToken);
 
         var achievementIdSet = achievementIds.ToHashSet();
-        var countsByStudent = achievementIdSet.Count == 0 || studentIds.Count == 0
-            ? new Dictionary<Guid, int>()
+        var rarityCounts = achievementIdSet.Count == 0 || studentIds.Count == 0
+            ? []
             : await dbContext.StudentAchievements
                 .AsNoTracking()
                 .Where(studentAchievement =>
                     studentIds.Contains(studentAchievement.StudentID) &&
                     achievementIdSet.Contains(studentAchievement.AchievementID))
-                .GroupBy(studentAchievement => studentAchievement.StudentID)
-                .Select(group => new
+                .GroupBy(studentAchievement => new
                 {
-                    StudentId = group.Key,
-                    AchievementCount = group.Count()
+                    StudentId = studentAchievement.StudentID,
+                    studentAchievement.Achievement.Rarity
                 })
-                .ToDictionaryAsync(
-                    item => item.StudentId,
-                    item => item.AchievementCount,
-                    cancellationToken);
+                .Select(group => new
+                    StudentAchievementRarityCount(
+                        group.Key.StudentId,
+                        group.Key.Rarity,
+                        group.Count()))
+                .ToListAsync(cancellationToken);
 
-        var entries = students
-            .Select(student => new LeaderboardEntryDto(
-                student.Id,
-                student.DisplayName,
-                student.CurrentEducationalGroupName,
-                countsByStudent.GetValueOrDefault(student.Id)))
-            .OrderByDescending(entry => entry.AchievementCount)
-            .ThenBy(entry => entry.StudentName, StringComparer.Ordinal)
-            .ThenBy(entry => entry.Group, StringComparer.Ordinal)
+        var countsByStudent = rarityCounts
+            .GroupBy(item => item.StudentId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.ToDictionary(item => item.Rarity, item => item.Count));
+
+        var candidates = students.Select(student =>
+        {
+            var counts = countsByStudent.GetValueOrDefault(student.Id) ?? [];
+            return new LeaderboardCandidate(
+                new LeaderboardEntryDto(
+                    student.Id,
+                    student.DisplayName,
+                    student.CurrentEducationalGroupName,
+                    counts.Values.Sum()),
+                counts);
+        });
+
+        var entries = LeaderboardOrdering.Order(
+                candidates,
+                candidate => candidate.Entry.AchievementCount,
+                (candidate, rarity) => candidate.RarityCounts.GetValueOrDefault(rarity),
+                candidate => candidate.Entry.StudentName,
+                candidate => candidate.Entry.Group,
+                candidate => candidate.Entry.StudentId)
+            .Select(candidate => candidate.Entry)
             .ToList();
 
         return new StudentLeaderboardQueryResult(
             StudentLeaderboardQueryStatus.Success,
             entries);
     }
+
+    private sealed record StudentAchievementRarityCount(
+        Guid StudentId,
+        AchievementRarity Rarity,
+        int Count);
+
+    private sealed record LeaderboardCandidate(
+        LeaderboardEntryDto Entry,
+        IReadOnlyDictionary<AchievementRarity, int> RarityCounts);
 }

@@ -507,6 +507,57 @@ public sealed class StudentApiTests(StudentApiFactory factory)
     }
 
     [Fact]
+    public async Task Leaderboard_EqualTotals_PrioritizesLegendaryAchievementsBeforeName()
+    {
+        using var client = CreateClient();
+        var additionalCommonAchievementId = Guid.NewGuid();
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AchievementDbContext>();
+            var peerBonusAchievement = await dbContext.Achievements.SingleAsync(
+                achievement => achievement.Id == StudentApiFactory.BonusAchievementId);
+            peerBonusAchievement.Rarity = AchievementRarity.Legendary;
+
+            dbContext.Achievements.Add(new AchievementEntity
+            {
+                Id = additionalCommonAchievementId,
+                Title = "Дополнительная обычная ачивка",
+                Description = "Создаёт равенство по общему количеству",
+                Rarity = AchievementRarity.Common,
+                CourseID = StudentApiFactory.CourseId,
+                Year = 2026
+            });
+            dbContext.StudentAchievements.Add(new StudentAchievementEntity
+            {
+                Id = Guid.NewGuid(),
+                StudentID = StudentApiFactory.StudentId,
+                AchievementID = additionalCommonAchievementId,
+                AchievementGotDate = DateTime.UtcNow,
+                AchievementFoundDate = DateTime.UtcNow
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        await Login(client, StudentApiFactory.StudentId);
+
+        var entries = await client.GetFromJsonAsync<List<LeaderboardEntryDto>>(
+            $"/api/student/courses/{StudentApiFactory.CourseId}/2026/leaderboard",
+            JsonOptions);
+        var leaderboard = Assert.IsType<List<LeaderboardEntryDto>>(entries);
+
+        Assert.Equal(
+            [
+                StudentApiFactory.CoursePeerStudentId,
+                StudentApiFactory.StudentId,
+                StudentApiFactory.CourseZeroAchievementStudentId
+            ],
+            leaderboard.Select(entry => entry.StudentId));
+        Assert.Equal(2, leaderboard[0].AchievementCount);
+        Assert.Equal(2, leaderboard[1].AchievementCount);
+    }
+
+    [Fact]
     public async Task Leaderboard_AdditionalCourse_ReturnsSelectedCourseStudentsWithIndependentCounts()
     {
         using var client = CreateClient();

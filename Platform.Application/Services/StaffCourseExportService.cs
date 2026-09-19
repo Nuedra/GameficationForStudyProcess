@@ -366,20 +366,40 @@ public sealed class StaffCourseExportService(
             .Where(student => student.IsActiveEnrollment)
             .ToList();
         var activeStudentIds = activeStudents.Select(student => student.Id).ToHashSet();
+        var raritiesByAchievement = snapshot.Achievements
+            .ToDictionary(achievement => achievement.Id, achievement => achievement.Rarity);
         var countsByStudent = snapshot.Awards
             .Where(award => activeStudentIds.Contains(award.StudentId))
-            .GroupBy(award => award.StudentId)
-            .ToDictionary(group => group.Key, group => group.Count());
+            .Select(award => new
+            {
+                award.StudentId,
+                Rarity = raritiesByAchievement[award.AchievementId]
+            })
+            .GroupBy(item => item.StudentId)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .GroupBy(item => item.Rarity)
+                    .ToDictionary(rarityGroup => rarityGroup.Key, rarityGroup => rarityGroup.Count()));
 
         var leaderboard = activeStudents
-            .Select(student => new
+            .Select(student =>
             {
-                Student = student,
-                AchievementCount = countsByStudent.GetValueOrDefault(student.Id)
+                var counts = countsByStudent.GetValueOrDefault(student.Id) ?? [];
+                return new LeaderboardExportEntry(
+                    student,
+                    counts.Values.Sum(),
+                    counts);
             })
-            .OrderByDescending(item => item.AchievementCount)
-            .ThenBy(item => item.Student.FullName ?? string.Empty, StringComparer.Ordinal)
-            .ThenBy(item => item.Student.Id)
+            .ToList();
+
+        leaderboard = LeaderboardOrdering.Order(
+                leaderboard,
+                entry => entry.AchievementCount,
+                (entry, rarity) => entry.RarityCounts.GetValueOrDefault(rarity),
+                entry => entry.Student.FullName ?? string.Empty,
+                entry => entry.Student.Group,
+                entry => entry.Student.Id)
             .ToList();
 
         for (var index = 0; index < leaderboard.Count; index++)
@@ -691,6 +711,11 @@ public sealed class StaffCourseExportService(
         string? Group,
         bool IsActiveEnrollment,
         bool IsPresentInLms);
+
+    private sealed record LeaderboardExportEntry(
+        ExportStudent Student,
+        int AchievementCount,
+        IReadOnlyDictionary<AchievementRarity, int> RarityCounts);
 
     private sealed record ExportAward(
         Guid Id,

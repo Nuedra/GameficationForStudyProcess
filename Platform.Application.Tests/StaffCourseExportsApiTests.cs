@@ -235,6 +235,54 @@ public sealed class StaffCourseExportsApiTests(StudentApiFactory factory)
     }
 
     [Fact]
+    public async Task CourseArchive_LeaderboardUsesRarityTieBreakers()
+    {
+        using var client = CreateClient();
+        var additionalCommonAchievementId = Guid.NewGuid();
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AchievementDbContext>();
+            var peerBonusAchievement = dbContext.Achievements.Single(
+                achievement => achievement.Id == StudentApiFactory.BonusAchievementId);
+            peerBonusAchievement.Rarity = AchievementRarity.Legendary;
+
+            dbContext.Achievements.Add(new AchievementEntity
+            {
+                Id = additionalCommonAchievementId,
+                Title = "Дополнительная обычная ачивка",
+                Description = "Создаёт равенство по общему количеству",
+                Rarity = AchievementRarity.Common,
+                CourseID = StudentApiFactory.CourseId,
+                Year = 2026
+            });
+            dbContext.StudentAchievements.Add(new StudentAchievementEntity
+            {
+                Id = Guid.NewGuid(),
+                StudentID = StudentApiFactory.StudentId,
+                AchievementID = additionalCommonAchievementId,
+                AchievementGotDate = DateTime.UtcNow,
+                AchievementFoundDate = DateTime.UtcNow
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        await Login(client, StudentApiFactory.TeacherId);
+        var response = await client.GetAsync(ArchiveUrl(StudentApiFactory.CourseId));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        await using var archiveStream = new MemoryStream(
+            await response.Content.ReadAsByteArrayAsync());
+        using var archive = new ZipArchive(archiveStream, ZipArchiveMode.Read);
+        var leaderboard = Encoding.UTF8.GetString(
+            await ReadEntryAsync(archive, "leaderboard.csv"));
+
+        Assert.True(
+            leaderboard.IndexOf("Мария Сидорова", StringComparison.Ordinal) <
+            leaderboard.IndexOf("Иван Иванов", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task CourseArchive_ResolvesEveryStudentReferencedByAwardsAndAudit()
     {
         using var client = CreateClient();
